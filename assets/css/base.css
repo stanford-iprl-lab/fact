@@ -1,0 +1,901 @@
+/* ============================================================
+   FACT — project page styles
+   White bg, bold Helvetica, green=success/fix, blue=force,
+   amber=attention, yellow=LN, purple=Beta.
+   ============================================================ */
+
+:root {
+  --bg:    #ffffff;
+  --ink:   #16181d;
+  --dim:   rgba(22,24,29,0.56);
+  --faint: rgba(22,24,29,0.20);
+  --hair:  rgba(22,24,29,0.12);
+  --panel: #f4f3ef;
+  --panel2:#eceae3;
+  --good:  #0ea66b;   /* success / the fix */
+  --force: #2563eb;   /* |F| force, blue */
+  --alert: #d97706;   /* amber attention / failure */
+  --ln:    #d4a017;   /* Logit-Normal schedule, yellow */
+  --fact:  #efddbc;   /* FACT (ours) — same sand as the pills / --accent */
+  --fact-tint: rgba(239,221,188,0.34);  /* FACT row wash, same rgb as --fact */
+  --beta:  #7c3aed;   /* Beta schedule, purple */
+
+  --helv: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* UI "mono" is now Helvetica; --code stays monospace for the BibTeX block,
+     which depends on column alignment. */
+  --mono: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --code: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --maxw: 1080px;
+  --gridsize: 48px;
+  --grid-on: 1;        /* toggled by tweaks */
+  --accent: #efddbc;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: 64px; }
+/* the collapsed bar is shorter on phones — match it so anchors land right */
+@media (max-width: 560px) { html { scroll-padding-top: 52px; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--helv);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: radial-gradient(var(--hair) 1.2px, transparent 1.2px);
+  background-size: var(--gridsize) var(--gridsize);
+  opacity: calc(var(--grid-on) * 1);
+  pointer-events: none;
+  z-index: 0;
+}
+img, video { max-width: 100%; display: block; }
+a { color: inherit; }
+
+/* tone: restrained dials weight + spacing down */
+html[data-tone="restrained"] {
+  --hero-weight: 600;
+  --h2-weight: 600;
+}
+html { --hero-weight: 800; --h2-weight: 750; }
+
+/* ---------- layout primitives ---------- */
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+.wide { max-width: 1320px; }
+section { position: relative; z-index: 1; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 22px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink);
+  line-height: 1.1;
+  display: flex; align-items: center; gap: 16px;
+  justify-content: flex-start;
+}
+/* hairline that trails the label, stopping at the text column */
+.eyebrow::after {
+  content: "";
+  flex: 1 1 auto; max-width: 140px;
+  height: 1px; background: var(--hair);
+}
+.sec-head { margin: 0 0 40px; max-width: 40ch; }
+.pad-tight .sec-head, .padb-tight .sec-head { margin-bottom: 28px; }
+.sec-head[style*="center"] { max-width: 46ch; margin-left: auto; margin-right: auto; }
+.sec-head[style*="center"] .lede { margin-left: auto; margin-right: auto; }
+.sec-head h2 {
+  font-size: clamp(30px, 4.4vw, 46px);
+  font-weight: var(--h2-weight);
+  letter-spacing: -0.025em; line-height: 1.04;
+  margin: 16px 0 0; text-wrap: balance;
+}
+.sec-head p.lede {
+  font-size: clamp(14.5px, 1.35vw, 16px);
+  color: var(--dim); max-width: 56ch; margin: 16px 0 0; line-height: 1.55;
+  text-wrap: pretty;
+}
+/* connective sentence between blocks inside a section, lede-styled, full width */
+p.bridge {
+  font-size: clamp(14.5px, 1.35vw, 16px);
+  color: var(--dim); margin: 40px 0 0; line-height: 1.55;
+  text-wrap: pretty;
+}
+/* caption + lede with no h2 — let the lede run the full column.
+   Must come after .sec-head p.lede: equal specificity, so order decides. */
+.sec-head-wide { max-width: none; margin-bottom: 34px; }
+.sec-head-wide p.lede { max-width: none; margin-top: 12px; }
+.pad { padding: clamp(64px, 9vw, 116px) 0; }
+.padb { padding-bottom: clamp(64px, 9vw, 116px); }
+/* tighter rhythm for the body sections below the abstract */
+.pad-tight { padding: clamp(28px, 3vw, 40px) 0; }
+.padb-tight { padding-bottom: clamp(40px, 5vw, 66px); }
+
+/* ---------- collapsed title bar ---------- */
+.titlebar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 70;
+  background: var(--accent);
+  /* slide is subtle: the bar is short, so a full-height translate reads as a
+     jump. Fade plus a few px of travel feels closer to it settling into place. */
+  transform: translateY(-6px);
+  transition: transform .26s cubic-bezier(.22,.61,.36,1), opacity .2s ease;
+  opacity: 0; pointer-events: none;
+}
+.titlebar.show { transform: none; opacity: 1; pointer-events: auto; }
+/* same .wrap container as the sections, so the title starts on their left edge */
+.tb-wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; padding-top: 11px; padding-bottom: 11px;
+}
+.tb-home {
+  font: inherit; font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--ink); text-align: left; cursor: pointer;
+  background: none; border: none; padding: 0;
+  min-width: 0; flex: 0 1 auto;
+}
+.tb-home:hover .tb-title { border-bottom-color: var(--ink); }
+.tb-home:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 3px; }
+.tb-title {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-bottom: 1px solid transparent; transition: border-color .15s;
+}
+.tb-links { display: flex; gap: 20px; flex: none; font-size: 13px; font-weight: 600; }
+/* darker than --dim: 56% grey washes out on the sand ground */
+.tb-links a {
+  color: rgba(22,24,29,0.66); text-decoration: none; white-space: nowrap;
+  transition: color .15s;
+}
+.tb-links a:hover { color: var(--ink); }
+/* hamburger: hidden on desktop, where the links sit inline */
+.tb-burger {
+  display: none; flex: none; position: relative;
+  width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px;
+  background: transparent; cursor: pointer;
+  transition: background .18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+/* soft ink wash on press/open rather than a hard border */
+.tb-burger:active,
+.tb-burger[aria-expanded="true"] { background: rgba(22,24,29,0.08); }
+.tb-burger .bl {
+  position: absolute; left: 10px; height: 1.5px; border-radius: 2px;
+  background: var(--ink); opacity: .78;
+  transition: transform .28s cubic-bezier(.4,.01,.2,1),
+              opacity .18s ease, width .28s cubic-bezier(.4,.01,.2,1);
+}
+/* staggered widths read as considered rather than a stock icon */
+.tb-burger .bl:nth-child(1) { top: 12px; width: 16px; }
+.tb-burger .bl:nth-child(2) { top: 17px; width: 12px; }
+.tb-burger .bl:nth-child(3) { top: 22px; width: 16px; }
+.tb-burger:hover .bl { opacity: 1; }
+.tb-burger:hover .bl:nth-child(2) { width: 16px; }
+/* morph to a clean X: outer bars meet in the middle, centre bar fades */
+.tb-burger[aria-expanded="true"] .bl { opacity: 1; width: 16px; }
+.tb-burger[aria-expanded="true"] .bl:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+.tb-burger[aria-expanded="true"] .bl:nth-child(2) { opacity: 0; width: 0; }
+.tb-burger[aria-expanded="true"] .bl:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+.tb-burger:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.tb-title-short { display: none; }
+/* Phones: collapse the links into a drop-down panel behind the hamburger. */
+@media (max-width: 1000px) {
+  .tb-wrap { gap: 12px; }
+  /* swap the long title for the short acronym once collapsed */
+  .tb-title { display: none; }
+  .tb-title-short { display: block; font-size: 20px; font-weight: 800; letter-spacing: 0.03em; }
+  .tb-burger { display: block; }
+  /* panel reads as paper dropping below the sand bar — not more sand */
+  .tb-links {
+    display: flex; flex-direction: column; gap: 0;
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: rgba(255,255,255,0.96);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--hair);
+    box-shadow: 0 10px 30px rgba(22,24,29,0.10);
+    /* collapsed by default; opened by .is-open */
+    max-height: 0; overflow: hidden; visibility: hidden;
+    opacity: 0;
+    transition: max-height .3s cubic-bezier(.22,.61,.36,1),
+                opacity .2s ease, visibility .3s;
+  }
+  .tb-links.is-open { max-height: 340px; visibility: visible; opacity: 1; }
+  .tb-links a {
+    padding: 14px 28px; font-size: 15px; font-weight: 600;
+    color: rgba(22,24,29,0.72);
+    position: relative;
+    transition: color .15s ease, background .15s ease, padding-left .18s ease;
+  }
+  /* hairline separators that stop short of the edge */
+  .tb-links a + a::before {
+    content: ""; position: absolute; top: 0; left: 28px; right: 28px;
+    height: 1px; background: var(--hair);
+  }
+  /* sand marker slides in on the active row */
+  .tb-links a::after {
+    content: ""; position: absolute; left: 0; top: 50%;
+    width: 3px; height: 0; border-radius: 0 2px 2px 0;
+    background: var(--accent); transform: translateY(-50%);
+    transition: height .18s ease;
+  }
+  .tb-links a:hover, .tb-links a:active {
+    color: var(--ink); background: rgba(22,24,29,0.03); padding-left: 32px;
+  }
+  .tb-links a:hover::after, .tb-links a:active::after { height: 22px; }
+}
+@media (max-width: 560px) {
+  .tb-wrap { padding-top: 9px; padding-bottom: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-links, .tb-burger .bl { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) { .titlebar { transition: opacity .22s ease; } }
+
+/* ---------- header / hero ---------- */
+.header { padding: clamp(48px, 7vw, 88px) 0 clamp(16px, 2vw, 24px); text-align: center; }
+.header .conf {
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600;
+}
+.header h1 {
+  font-size: clamp(33px, 5.6vw, 64px);
+  font-weight: var(--hero-weight);
+  letter-spacing: -0.032em; line-height: 1.02;
+  margin: 20px auto 0; max-width: 28ch; text-wrap: balance;
+}
+.header .expand {
+  margin: 22px auto 0; max-width: 50ch;
+  font-size: clamp(16px, 1.8vw, 20px); color: var(--dim); line-height: 1.45;
+}
+.header .expand b { color: var(--ink); font-weight: 700; }
+.header .acro { color: var(--accent); font-weight: 800; }
+
+.authors {
+  margin: 30px auto 0; max-width: 760px;
+  display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: center;
+  font-size: 17.5px;
+}
+.authors .a { font-weight: 600; }
+.authors .a sup { color: var(--ink); font-weight: 700; font-size: 0.7em; }
+.authors .a a {
+  color: inherit; text-decoration: none;
+  border-bottom: 1px solid var(--faint);
+  transition: border-color .15s;
+}
+.authors .a a:hover { border-bottom-color: var(--ink); }
+.affil {
+  margin: 16px auto 0; color: var(--dim); font-size: 16.5px;
+  display: flex; flex-wrap: wrap; gap: 4px 20px; justify-content: center;
+}
+.affil sup { color: var(--ink); font-weight: 700; }
+
+.btnrow { margin: 32px auto 0; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+/* squared sand fill, no outline — empties to white on hover */
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 12px 21px; border-radius: 6px;
+  font-size: 14.5px; font-weight: 600; text-decoration: none;
+  background: var(--accent); color: var(--ink); border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+/* keep a hairline on hover so the shape doesn't vanish against the white page */
+.btn:hover { background: #fff; border-color: var(--hair); }
+.btn .ic { width: 16px; height: 16px; display: inline-block; }
+/* disabled button — muted, no hover, not clickable */
+.btn.is-disabled {
+  background: var(--panel); color: var(--dim); cursor: not-allowed;
+  border-color: var(--hair);
+}
+.btn.is-disabled:hover { background: var(--panel); border-color: var(--hair); }
+.btn.is-disabled .ic { opacity: .55; }
+
+/* ---------- montage ---------- */
+.montage { margin-top: clamp(36px, 5vw, 60px); }
+.montage-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(5, 1fr);
+}
+@media (max-width: 900px){ .montage-grid { grid-template-columns: repeat(2, 1fr); } }
+.hero-vid {
+  position: relative; border-radius: 14px; overflow: hidden;
+  background: #0c0c0c; aspect-ratio: 16/9;
+  box-shadow: 0 14px 40px rgba(22,24,29,0.12);
+}
+.hero-vid video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-vid:fullscreen { border-radius: 0; border: none; aspect-ratio: auto; }
+.hero-vid:fullscreen video { object-fit: contain; }
+
+/* custom video controls */
+.vctrl {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 14px 12px;
+  /* scrim keeps the controls legible over bright frames */
+  background: linear-gradient(0deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+/* reveal on hover, on keyboard focus, or whenever the video is paused.
+   :has(:focus-visible) — not :focus-within — so a mouse click doesn't
+   leave the controls stuck on after the pointer moves away. */
+.hero-vid:hover .vctrl,
+.hero-vid:has(:focus-visible) .vctrl,
+.hero-vid.paused .vctrl { opacity: 1; pointer-events: auto; }
+
+@media (hover: none) {
+  /* touch has no hover — keep controls up so they stay reachable */
+  .vctrl { opacity: 1; pointer-events: auto; }
+}
+.vrow { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- scrub bar ---------- */
+.vscrub { width: 100%; align-self: stretch; padding: 6px 0; cursor: pointer; touch-action: none; }
+.vscrub:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 4px; }
+.vtrack {
+  position: relative; height: 6px; border-radius: 999px;
+  /* dark, opaque base — a translucent white bar vanishes on bright frames */
+  background: rgba(12,12,12,0.55);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  backdrop-filter: blur(6px);
+  transition: height 0.12s ease;
+}
+.vfill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  border-radius: 999px; background: #fff;
+}
+.vknob {
+  position: absolute; top: 50%; left: 0;
+  width: 12px; height: 12px; border-radius: 50%; background: #fff;
+  transform: translate(-50%, -50%) scale(1);
+  transition: transform 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.vscrub:hover .vtrack, .vscrub.dragging .vtrack { height: 8px; }
+.vscrub:hover .vknob, .vscrub.dragging .vknob { transform: translate(-50%, -50%) scale(1.25); }
+.vtime {
+  font-family: var(--helv); font-size: 12px; color: #fff;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6); padding-left: 2px;
+  user-select: none;
+}
+.vspacer { flex: 1; }
+.vbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 34px; padding: 0 9px;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: rgba(12,12,12,0.6); color: #fff;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  backdrop-filter: blur(6px); transition: background 0.15s ease;
+}
+.vbtn:hover { background: rgba(12,12,12,0.82); }
+.vbtn svg { width: 18px; height: 18px; }
+.vspeed { min-width: 42px; }
+.vbtn .i-pause { display: none; }
+.hero-vid.playing .vbtn .i-play { display: none; }
+.hero-vid.playing .vbtn .i-pause { display: block; }
+/* Icons are state indicators: crossed-out speaker shown while muted. */
+.vbtn .i-mute { display: none; }
+.hero-vid.muted .vbtn .i-unmute { display: none; }
+.hero-vid.muted .vbtn .i-mute { display: block; }
+.mtile {
+  position: relative; border-radius: 12px; overflow: hidden;
+  background: #0c0c0c; aspect-ratio: 4/3;
+  border: 1px solid var(--hair); box-shadow: 0 10px 30px rgba(22,24,29,0.10);
+}
+.mtile video { width: 100%; height: 100%; object-fit: cover; }
+.mtile .cap {
+  position: absolute; left: 10px; bottom: 9px;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em;
+  color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.7); font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.mtile .ok {
+  position: absolute; right: 9px; top: 9px;
+  background: var(--good); color: #fff; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 7px; border-radius: 999px;
+}
+.statband {
+  margin-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 30px;
+  justify-content: center; text-align: center;
+  font-size: clamp(16px, 1.8vw, 20px); color: var(--dim);
+}
+.statband b { font-weight: 800; }
+.statband .big { color: var(--good); font-size: 1.3em; font-weight: 800; }
+.statband .amber { color: var(--alert); font-weight: 800; }
+
+/* ---------- generic content ---------- */
+.prose { max-width: 64ch; margin: 0 auto; font-size: clamp(14.5px, 1.35vw, 16px); line-height: 1.62; color: #2a2d33; }
+.prose.left { margin: 0; }
+.prose.full { max-width: none; }
+/* match the section-2 lede: same size, colour, measure and leading */
+.prose.lede { font-size: clamp(14.5px, 1.35vw, 16px); color: var(--dim); max-width: 56ch; line-height: 1.55; }
+/* centred section: caption centres with the prose, rules on both sides */
+.abstract .sec-head { max-width: none; }
+.abstract .eyebrow { justify-content: center; }
+.abstract .eyebrow::before {
+  content: ""; flex: 1 1 auto; max-width: 140px;
+  height: 1px; background: var(--hair);
+}
+.abstract .prose {
+  margin: 0 auto; text-align: center;
+  font-size: clamp(14.5px, 1.35vw, 16px);
+  color: var(--dim); max-width: 78ch; line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* ---------- diagnosis triptych ---------- */
+.tript { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+/* tablet: 3 columns get cramped, drop to a centered single column */
+@media (max-width: 860px){ .tript { grid-template-columns: 1fr; } }
+/* phones: keep the cards full-width (aligned with the section text), but make
+   the video area itself shorter so the clips aren't oversized. */
+@media (max-width: 560px){
+  .tript { gap: 18px; }
+  .diag .vid { aspect-ratio: 16/9; }
+  .diag .body { padding: 12px 16px 16px; }
+  .diag .body h4 { font-size: 15px; }
+}
+.diag {
+  border-radius: 14px; overflow: hidden; border: 1px solid var(--hair);
+  background: #fff; box-shadow: 0 8px 24px rgba(22,24,29,0.07);
+}
+/* Clips are 1080×1200 on a WHITE ground, so the frame has no visible edge —
+   cropping with `cover` pushed the plug low and it ran into the heading.
+   `contain` on a white box shows the whole clip; the padding below gives the
+   prongs clearance from the text. */
+/* white ground — clips are line art on white.
+   Taller box + object-position:top reveals more of the frame's lower area,
+   which is where the clips' baked-in whitespace sits. */
+.diag .vid { position: relative; aspect-ratio: 23/20; background: #fff; }
+.diag video { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+/* force-profile clips are taller (chart under the plug): show the whole frame */
+.tript.fp-on .diag video { object-fit: contain; object-position: center; }
+.diag .body { padding: 18px 18px 20px; }
+/* force-profile overlay: an inset chart over the playing video, toggled on/off */
+.diag-toggle { display: flex; justify-content: center; margin-top: 20px; }
+.fp-switch {
+  display: inline-flex; align-items: center; gap: 10px;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--dim);
+  background: none; border: 0; padding: 6px 4px; cursor: pointer;
+  transition: color .15s;
+}
+.fp-switch:hover, .fp-switch[aria-pressed="true"] { color: var(--ink); }
+.fp-track {
+  position: relative; width: 38px; height: 22px; border-radius: 999px;
+  background: var(--panel2); border: 1px solid var(--hair);
+  transition: background .18s;
+}
+.fp-knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(22,24,29,0.25);
+  transition: transform .18s ease;
+}
+.fp-switch[aria-pressed="true"] .fp-track { background: var(--accent); }
+.fp-switch[aria-pressed="true"] .fp-knob { transform: translateX(16px); }
+.diag .body h4 { margin: 0 0 7px; font-size: 17px; font-weight: 750; }
+.diag .body p { margin: 0; font-size: clamp(14.5px, 1.35vw, 16px); color: var(--dim); line-height: 1.55; }
+
+/* ---------- method ---------- */
+/* fixes stack vertically, one after another */
+.fixstack { display: flex; flex-direction: column; gap: 22px; }
+.method { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: stretch; }
+@media (max-width: 920px){ .method { grid-template-columns: 1fr; } }
+.mcard {
+  background: var(--panel); border: 1px solid var(--hair); border-radius: 18px;
+  padding: 30px 28px; display: flex; flex-direction: column;
+}
+/* the diagnosis pair sits directly on the tinted section — no panel behind it.
+   Must follow .mcard: same specificity would lose on order. */
+#diagnosis .mcard {
+  background: none; border: none; border-radius: 0; padding: 0;
+}
+/* sand pill, matching the tags overlaid on the diagnosis videos */
+.mcard .k {
+  /* .mcard is a column flex container, so children stretch full-width by
+     default — align-self shrinks the pill to its text. */
+  display: inline-block; align-self: flex-start;
+  font-family: var(--mono); font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-weight: 700; margin-bottom: 12px;
+  /* line-height:1 so the pill hugs the text; the trailing letter-space from
+     tracking would otherwise sit inside the right padding */
+  line-height: 1; padding: 6px 10px 5px 11px;
+  border-radius: 999px;
+  background: var(--accent); color: var(--ink);
+}
+/* Phones: these labels wrap to 3-5 lines, and line-height:1 with a pill radius
+   makes the wrapped text collide. Smaller type, real leading, softer corners. */
+@media (max-width: 560px) {
+  .mcard .k {
+    font-size: 12.5px; letter-spacing: 0.05em;
+    line-height: 1.35; padding: 7px 11px;
+    border-radius: 10px;
+    align-self: stretch;
+  }
+}
+.mcard h3 { margin: 0 0 10px; font-size: clamp(21px, 2.4vw, 27px); font-weight: 750; letter-spacing: -0.02em; line-height: 1.08; }
+.mcard p { margin: 0 0 18px; font-size: clamp(14.5px, 1.35vw, 16px); color: var(--dim); line-height: 1.58; }
+.mcard p:last-child { margin-bottom: 0; }
+.mcard .figbox {
+  margin-top: auto; background: #fff; border: 1px solid var(--hair); border-radius: 12px;
+  padding: 14px; overflow: hidden;
+}
+.chart-cap { font-family: var(--mono); font-size: 14px; color: var(--dim); letter-spacing: 0.04em; margin-top: 8px; text-align: center; }
+
+/* ---------- interactive schedule controls ---------- */
+.sched-ctrl {
+  margin-top: 14px; padding: 14px 16px 12px;
+  background: #fff; border: 1px solid var(--hair); border-radius: 12px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.sc-group { display: flex; flex-direction: column; gap: 8px; }
+.sc-group + .sc-group { padding-top: 10px; border-top: 1px solid var(--hair); }
+.sc-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink);
+}
+.sc-key { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.sc-row { display: grid; grid-template-columns: 108px 1fr 58px; align-items: center; gap: 12px; cursor: pointer; }
+.sc-lab { font-size: 15.5px; font-weight: 600; color: var(--ink); }
+.sc-lab i { font-style: italic; color: var(--dim); }
+.sc-val {
+  font-family: var(--helv); font-size: 14.5px; color: var(--dim);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.sc-row input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; border-radius: 999px;
+  background: var(--panel2); outline: none; cursor: pointer;
+}
+.sc-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: none; box-shadow: 0 1px 3px rgba(22,24,29,0.22); cursor: pointer;
+}
+.sc-row input[type="range"]::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: none; box-shadow: 0 1px 3px rgba(22,24,29,0.22); cursor: pointer;
+}
+.sc-row input[type="range"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.sc-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 3px; padding-top: 10px; border-top: 1px solid var(--hair);
+}
+.sc-read { font-size: 15.5px; color: var(--dim); }
+.sc-read b { color: var(--ink); font-variant-numeric: tabular-nums; }
+/* matches .btn in the header: sand fill, no outline, empties to white on hover */
+.sc-reset {
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 8px 15px; border-radius: 6px; cursor: pointer;
+  background: var(--accent); color: var(--ink); border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.sc-reset:hover { background: #fff; border-color: var(--hair); }
+.legend { display: flex; gap: 24px; justify-content: center; margin-top: 10px; font-size: 15.5px; font-family: var(--mono); }
+.legend span { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+.legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+
+.pill-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.pill-list li { display: flex; gap: 11px; font-size: clamp(14.5px, 1.35vw, 16px); color: var(--dim); line-height: 1.55; }
+.pill-list li b { color: var(--ink); font-weight: 700; }
+
+/* ---------- architecture tabs ---------- */
+/* A segmented control, matching .seg in the gallery. Short labels in a pill row
+   read as switchable immediately; the long prose that used to live in each
+   button made them look like body text, not controls. */
+.arch-tabs {
+  /* align-self: .mcard is a column flex container, so children stretch to full
+     width by default and inline-flex alone will not shrink-wrap the bar. */
+  /* grid, not flex: equal columns sized to the widest label so every option
+     is the same width instead of hugging its own text. */
+  display: inline-grid; align-self: flex-start;
+  grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); gap: 3px;
+  background: var(--panel); border: 1px solid var(--hair);
+  border-radius: 10px; padding: 4px; margin-bottom: 14px;
+}
+.arch-opt {
+  font: inherit; font-size: 16px; font-weight: 600;
+  color: var(--dim); background: none; border: 0;
+  padding: 10px 19px; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; transition: background .15s, color .15s;
+}
+.arch-opt:hover { color: var(--ink); background: rgba(255,255,255,0.7); }
+.arch-opt:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.arch-opt.is-on { background: var(--accent); color: var(--ink); }
+
+/* ---- phones: schedule controls + arch tabs ---- */
+@media (max-width: 560px) {
+  /* the 108px label column squeezed the slider down to a few px — stack the
+     label above a full-width track instead. */
+  .sc-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "lab val" "inp inp";
+    gap: 4px 10px; row-gap: 8px;
+  }
+  .sc-lab { grid-area: lab; font-size: 14px; }
+  .sc-val { grid-area: val; }
+  .sc-row input[type="range"] { grid-area: inp; width: 100%; }
+  .sc-group { gap: 12px; }
+  .sched-ctrl { padding: 14px; }
+  .sc-foot { gap: 10px; }
+
+  /* stacked rows, sized to the widest label, centred in the card */
+  .arch-tabs {
+    display: grid; grid-auto-flow: row;
+    grid-template-columns: max-content; grid-auto-columns: auto; gap: 4px;
+    align-self: center; width: auto;
+  }
+  .arch-opt { font-size: 14px; padding: 10px 16px; text-align: center; }
+}
+.arch-desc {
+  margin: 0 0 4px;
+  font-size: clamp(14.5px, 1.35vw, 16px); line-height: 1.55; color: var(--dim);
+}
+.arch-desc b { color: var(--ink); font-weight: 700; }
+.archfig img { border-radius: 10px; }
+/* sits in the white space below the diagram, not above it */
+.arch-note {
+  margin: 10px 0 2px; text-align: center;
+  font-size: 13px; font-weight: 400; color: var(--dim);
+  letter-spacing: 0.04em;
+}
+.arch-note[hidden] { display: none; }
+@media (max-width: 560px) { .mcard p.arch-note { font-size: 10.5px; letter-spacing: 0.02em; } }
+.archfig.img-missing img { display: none; }
+.archfig.img-missing::before {
+  content: "Architecture diagram not found";
+  display: block; padding: 34px 16px; text-align: center;
+  background: var(--panel); border: 1px dashed var(--hair); border-radius: 10px;
+  font-size: 13px; color: var(--dim);
+}
+.pill-list .mk { flex: none; margin-top: 3px; width: 9px; height: 9px; border-radius: 3px; background: var(--accent); }
+
+/* ---------- architecture figure ---------- */
+/* diagram fills the frame edge to edge — the images already carry their own
+   whitespace, so extra padding just shrinks them */
+/* diagram centred on a white field, capped so it does not dominate the card */
+.archfig {
+  background: #fff; border: 1px solid var(--hair); border-radius: 12px;
+  padding: 16px; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.archfig img {
+  width: auto; max-width: 58%; height: auto; display: block; border-radius: 0;
+}
+@media (max-width: 900px) { .archfig img { max-width: 100%; } }
+/* phones: drop the card padding so the diagram uses the full width */
+@media (max-width: 560px) { .archfig { padding: 0; } }
+.figcap { margin: 18px auto 0; max-width: 80ch; text-align: center; font-size: clamp(14.5px, 1.35vw, 16px); color: var(--dim); line-height: 1.55; }
+.figcap b { color: var(--ink); font-weight: 700; }
+
+/* ---------- results ---------- */
+.results-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 40px; align-items: center; }
+/* grid items default to min-width:auto, so the 560px-min table would push the
+   whole page wide instead of letting .tbl-wrap scroll. */
+.results-grid > * { min-width: 0; }
+@media (max-width: 920px){ .results-grid { grid-template-columns: 1fr; gap: 30px; } }
+.barchart { display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 22px); height: 320px; padding-top: 30px; border-bottom: 2px solid var(--ink); }
+.barchart .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; padding-bottom: 46px; }
+.barchart .bar .col {
+  width: 100%; border-radius: 6px 6px 0 0; position: relative;
+  background: var(--panel2); height: 0; transition: height 1s cubic-bezier(.2,.7,.2,1);
+}
+.barchart .bar.fact .col { background: var(--fact); }
+.barchart .bar.ln .col { background: var(--ink); }
+.barchart .bar .val { position: absolute; top: -28px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 17px; }
+.barchart .bar.fact .val { color: var(--ink); }
+.barchart .bar .lab {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 2px; line-height: 1.25;
+  font-size: 13px; color: var(--dim); text-align: center; font-weight: 600;
+}
+.barchart .bar.fact .lab { color: var(--ink); font-weight: 800; }
+/* phones: the fixed 320px height leaves a dead gap once bars narrow, and the
+   two-line labels need more room than the 46px strip. */
+@media (max-width: 560px) {
+  .barchart { height: 220px; gap: 6px; padding-top: 24px; }
+  .barchart .bar { padding-bottom: 52px; }
+  .barchart .bar .lab { height: 52px; font-size: 11px; }
+  .barchart .bar .lab .ours { font-size: 10px; }
+  .barchart .bar .val { font-size: 13px; top: -22px; }
+}
+.barchart .bar .lab .ours { display: block; font-weight: 600; font-size: 12px; color: var(--dim); }
+table.res th .ours { font-weight: 600; font-size: 12px; color: var(--dim); }
+
+/* table */
+.tbl-wrap { overflow-x: auto; margin-top: 8px; -webkit-overflow-scrolling: touch; }
+table.res { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
+table.res th, table.res td { padding: 11px 12px; text-align: center; border-bottom: 1px solid var(--hair); }
+table.res thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+table.res tbody th { text-align: left; font-weight: 600; white-space: nowrap; }
+table.res td.sr { font-variant-numeric: tabular-nums; }
+table.res tr.fact { background: var(--fact-tint); }
+table.res tr.fact th, table.res tr.fact td { font-weight: 800; }
+table.res tr.fact td.all { color: var(--ink); }
+table.res td.all { font-weight: 700; }
+table.res thead th .hib { font-weight: 700; color: var(--faint); }
+
+/* hover crosshair: row + column wash. Column needs JS (no CSS column selector). */
+table.res tbody tr:hover { background: var(--panel); }
+table.res tbody tr.fact:hover { background: var(--fact-tint); }
+table.res td.col-hl, table.res th.col-hl { background: var(--panel); }
+table.res tbody tr.fact td.col-hl { background: transparent; }
+table.res th, table.res td { transition: background 120ms ease; }
+@media (hover: none) { table.res tbody tr:hover, table.res td.col-hl, table.res th.col-hl { background: none; } }
+.tbl-note { margin-top: 12px; font-size: 13px; color: var(--dim); }
+
+/* ---------- references ---------- */
+.reflist { margin: 0; padding-left: 1.6em; max-width: none; }
+.reflist li {
+  font-size: 13px; line-height: 1.5; color: var(--dim);
+  margin-bottom: 9px; padding-left: 4px;
+}
+.reflist li::marker { color: var(--ink); font-weight: 600; }
+.reflist a, .prose a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--faint); transition: border-color .15s; }
+.reflist a:hover, .prose a:hover { border-bottom-color: var(--ink); }
+/* offset so a jumped-to entry isn't flush against the viewport top */
+.reflist li:target { scroll-margin-top: 24px; }
+.reflist li:target::marker { color: var(--ink); }
+
+/* inline citation markers */
+a.cite {
+  color: var(--ink); text-decoration: none; font-weight: 600;
+  font-size: 0.88em; white-space: nowrap;
+  padding: 0 1px; border-radius: 3px;
+  transition: background .15s;
+}
+a.cite:hover { background: var(--accent); }
+
+/* ---------- gallery picker ---------- */
+.gallery { }
+.picker { display: flex; flex-wrap: wrap; gap: 22px 34px; margin-bottom: 28px; }
+.pgroup { display: flex; flex-direction: column; gap: 9px; }
+.pgroup .plabel { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--hair); border-radius: 10px; padding: 4px; gap: 3px; flex-wrap: wrap; }
+/* one shared control height across every picker group, so the Task, Policy
+   and Outcome rows line up regardless of icon vs text content */
+.seg { --seg-btn: 40px; }
+.seg button {
+  border: 0; background: transparent; cursor: pointer; font-family: var(--helv);
+  font-size: 13.5px; font-weight: 600; color: var(--dim); border-radius: 6px;
+  height: var(--seg-btn); padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .14s;
+}
+/* task picker is icon-only: square targets, label lives in aria-label/title */
+/* icon + task name pill */
+.seg.tasks button { gap: 7px; padding: 0 12px; line-height: 1; }
+.seg.tasks img {
+  width: 22px; height: 22px; display: block; flex: none;
+  /* icons are dark line art on white; dim them until selected */
+  opacity: .5; transition: opacity .14s;
+}
+.seg.tasks .t-name { font-size: 13.5px; font-weight: 600; }
+.seg.tasks button:hover img { opacity: .8; }
+.seg.tasks button[aria-pressed="true"] img { opacity: 1; }
+/* phones: icons only — drop the text labels so the row stays compact. The
+   name stays in the DOM (visually hidden) for screen readers and the title
+   tooltip still carries it. */
+@media (max-width: 560px) {
+  /* larger label on the text pickers (policy / outcome) */
+  .seg:not(.tasks) button { font-size: 15.5px; }
+  .seg.tasks { align-self: center; gap: 3px; }
+  .seg.tasks button { width: var(--seg-btn); padding: 0; gap: 0; }
+  .seg.tasks img { width: 22px; height: 22px; }
+  .seg.tasks .t-name {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+.seg button:hover { color: var(--ink); }
+/* selected = sand fill; dark text, since sand is too light for white */
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
+.seg.methods button[aria-pressed="true"][data-m="FACT"] { background: var(--fact); }
+/* softened fills — the tint carries the meaning, ink keeps the text legible */
+.seg.outcome button[aria-pressed="true"][data-o="success"] { background: rgba(14,166,107,0.30); color: var(--ink); }
+.seg.outcome button[aria-pressed="true"][data-o="failure"] { background: rgba(220,38,38,0.30); color: var(--ink); }
+
+.stage {
+  position: relative; border-radius: 16px; overflow: hidden; background: #0a0a0a;
+  border: 1px solid var(--hair); box-shadow: 0 18px 50px rgba(22,24,29,0.16);
+  aspect-ratio: 32/9; max-width: 1180px; margin: 0 auto;
+}
+/* two camera views, side by side and playing in lockstep */
+.stage .views { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 100%; height: 100%; background: var(--hair); }
+.stage .view { position: relative; overflow: hidden; background: #0a0a0a; }
+/* cover, not contain: the clips are ~4:3 in a 16:9 pane, so contain leaves
+   heavy pillarboxing. Cover crops the edges instead and fills the frame. */
+.stage video { width: 100%; height: 100%; object-fit: cover; background: #0a0a0a; display: block; }
+.stage .vtag {
+  position: absolute; left: 10px; bottom: 10px; z-index: 2;
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.82); background: rgba(10,10,10,0.55);
+  padding: 4px 8px; border-radius: 5px; backdrop-filter: blur(3px);
+}
+@media (max-width: 720px) {
+  .stage { aspect-ratio: 16/18; }
+  .stage .views { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+}
+.stage .missing {
+  position: absolute; inset: 0; display: none; flex-direction: column; gap: 8px;
+  align-items: center; justify-content: center; text-align: center; padding: 30px;
+  background: #0a0a0a; color: #cfd2d6; font-family: var(--mono); font-size: 13px; line-height: 1.5;
+}
+.stage.is-missing .missing { display: flex; }
+.stage .pause-ic {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,0.45);
+  display: none; align-items: center; justify-content: center; pointer-events: none;
+}
+.stage.is-paused .pause-ic { display: flex; }
+.stage .pause-ic::before {
+  content: ""; border-left: 18px solid #fff; border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent; margin-left: 5px;
+}
+/* replay: appears over a dimmed stage once both clips have finished */
+.stage .replay {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(.96);
+  z-index: 3; display: none; align-items: center; gap: 9px;
+  padding: 12px 20px; border-radius: 999px; border: 0; cursor: pointer;
+  font-family: var(--helv); font-size: 14px; font-weight: 700;
+  background: var(--accent); color: var(--ink);
+  box-shadow: 0 8px 26px rgba(0,0,0,0.35);
+  transition: transform .16s ease, background .15s;
+}
+.stage.is-ended .replay { display: inline-flex; transform: translate(-50%,-50%) scale(1); }
+.stage .replay:hover { background: #fff; }
+.stage .replay svg { width: 17px; height: 17px; }
+/* dim the last frame so the button reads clearly against it */
+.stage.is-ended .views::after {
+  content: ""; position: absolute; inset: 0; z-index: 2;
+  background: rgba(10,10,10,0.45); pointer-events: none;
+}
+.stage .views { position: relative; }
+.gallery-note { text-align: center; margin-top: 16px; font-size: 13.5px; color: var(--dim); }
+
+/* ---------- ablation ---------- */
+/* ---------- bibtex ---------- */
+.bibtex { background: #14161b; border-radius: 16px; overflow: hidden; border: 1px solid #14161b; }
+.bibtex .bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1c1f26; }
+.bibtex .bar span { font-family: var(--mono); font-size: 12px; color: #9aa0a8; letter-spacing: 0.08em; }
+.bibtex .copy { background: #2a2e37; color: #e7e9ec; border: 0; cursor: pointer; font-family: var(--mono); font-size: 12px; padding: 7px 13px; border-radius: 7px; transition: background .15s; }
+.bibtex .copy:hover { background: #353a45; }
+.bibtex pre { margin: 0; padding: 20px 18px; overflow-x: auto; color: #cdd2d8; font-family: var(--code); font-size: 13px; line-height: 1.6; }
+.bibtex pre .key { color: var(--good); }
+.bibtex pre .fld { color: #8ab4ff; }
+
+/* ---------- footer ---------- */
+/* ---------- floating back-to-top ---------- */
+.to-top {
+  position: fixed; right: 28px; bottom: 28px; z-index: 60;
+  width: 44px; height: 44px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: var(--accent); color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(22,24,29,0.18);
+  opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity .2s ease, transform .2s ease, visibility .2s, background .15s;
+}
+.to-top.show { opacity: 1; visibility: visible; transform: none; }
+.to-top:hover { background: var(--ink); color: var(--accent); }
+.to-top svg { width: 20px; height: 20px; }
+@media (prefers-reduced-motion: reduce) { .to-top { transition: opacity .2s ease, visibility .2s; } }
+
+.footer { border-top: 1px solid var(--hair); padding: 40px 0 60px; text-align: center; color: var(--dim); font-size: 13.5px; }
+.foot-logo { display: inline-block; opacity: .8; transition: opacity .15s; }
+.foot-logo:hover { opacity: 1; }
+.foot-logo img { height: 34px; width: auto; }
+.footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.foot-legal { margin: 22px 0 0; }
+.foot-contact { margin: 6px 0 0; }
+
+/* ---------- reveal ---------- */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce){ .reveal { opacity: 1; transform: none; transition: none; } }

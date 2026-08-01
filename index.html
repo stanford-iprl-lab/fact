@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-C6JL80Q0NN"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-C6JL80Q0NN');
+</script>
+
+<title>Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them</title>
+<meta name="description" content="Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them" />
+
+<!-- social share preview (Open Graph + Twitter) -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://stanford-iprl-lab.github.io/fact/" />
+<meta property="og:title" content="Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them" />
+<meta property="og:description" content="FACT diagnoses two distinct failure modes in contact-rich manipulation and fixes each, lifting average success from 41% to 66% across ~2,500 real-world rollouts." />
+<meta property="og:image" content="https://stanford-iprl-lab.github.io/fact/assets/icons/share-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them" />
+<meta name="twitter:description" content="FACT diagnoses two distinct failure modes in contact-rich manipulation and fixes each, lifting average success from 41% to 66% across ~2,500 real-world rollouts." />
+<meta name="twitter:image" content="https://stanford-iprl-lab.github.io/fact/assets/icons/share-card.png" />
+
+<link rel="icon" type="image/png" href="assets/icons/plug_logo.png" />
+<link rel="apple-touch-icon" href="assets/icons/plug_logo.png" />
+<link rel="stylesheet" href="assets/css/base.css" />
+</head>
+<body>
+
+<!-- collapsed title bar, revealed once the hero title scrolls away -->
+<div id="titlebar" class="titlebar">
+  <div class="wrap tb-wrap">
+    <button type="button" class="tb-home" aria-label="Back to top">
+      <span class="tb-title">Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them</span>
+      <span class="tb-title-short" aria-hidden="true">FACT</span>
+    </button>
+    <button type="button" class="tb-burger" id="tb-burger"
+            aria-label="Open menu" aria-expanded="false" aria-controls="tb-menu">
+      <span class="bl"></span><span class="bl"></span><span class="bl"></span>
+    </button>
+    <nav class="tb-links" id="tb-menu" aria-label="Sections">
+      <a href="#abstract">Abstract</a>
+      <a href="#diagnosis">Diagnosis</a>
+      <a href="#method">Approach</a>
+      <a href="#results">Results</a>
+      <a href="#bibtex">BibTeX</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header class="header" data-screen-label="Header">
+  <div class="wrap">
+    <h1>Demystifying When and Why VLAs Fail in Contact-Rich Tasks and How to Fix Them</h1>
+
+    <div class="authors">
+      <span class="a"><a href="https://carlotapares.com/" target="_blank" rel="noopener">Carlota Parés-Morlans</a></span>
+      <span class="a"><a href="https://nilskuhn.com/" target="_blank" rel="noopener">Nils Kuhn</a></span>
+      <span class="a"><a href="https://isabelliu0.github.io/" target="_blank" rel="noopener">Isabel Liu</a></span>
+      <span class="a"><a href="https://albilo17.github.io/" target="_blank" rel="noopener">Alberta Longhini</a></span>
+      <span class="a"><a href="https://web.stanford.edu/~bohg/" target="_blank" rel="noopener">Jeannette Bohg</a></span>
+    </div>
+    <div class="affil">
+      <span>Stanford University</span>
+    </div>
+
+    <div class="btnrow">
+      <a class="btn primary" href="#" data-link="paper">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        Paper (PDF)
+      </a>
+      <span class="btn alt is-disabled" role="link" aria-disabled="true" data-link="code">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 18l-6-6 6-6M16 6l6 6-6 6"/></svg>
+        Code
+      </span>
+    </div>
+  </div>
+
+  <!-- hero video -->
+  <div class="wrap montage reveal">
+    <div class="hero-vid" id="heroVid">
+      <video muted loop playsinline preload="metadata" src="assets/icons/FACT_video.mp4"></video>
+      <div class="vctrl">
+        <div class="vscrub" data-act="scrub" role="slider" tabindex="0"
+             aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="vtrack"><div class="vfill"></div><div class="vknob"></div></div>
+        </div>
+        <div class="vrow">
+        <button class="vbtn" data-act="play" aria-label="Play or pause">
+          <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <button class="vbtn" data-act="mute" aria-label="Mute or unmute">
+          <svg class="i-unmute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <svg class="i-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+        </button>
+        <button class="vbtn vspeed" data-act="speed" aria-label="Playback speed">1×</button>
+        <span class="vtime" data-act="time">0:00 / 0:00</span>
+        <span class="vspacer"></span>
+        <button class="vbtn" data-act="fs" aria-label="Toggle fullscreen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ ABSTRACT ============ -->
+<section class="pad-tight abstract" id="abstract" data-screen-label="Abstract">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Abstract</div>
+    </div>
+    <p class="prose reveal">
+      We address the problem of understanding when and why Vision-Language-Action models struggle
+      with contact-rich manipulation tasks that require precise physical interaction. Prior work has
+      primarily focused on addressing contact failures through force-augmented architectures and
+      training-time regularizers, yet the root causes of these failures remain underexplored. We
+      identify two distinct failure modes underlying this gap. Precision failures are rooted in a
+      flow-matching policy training mismatch, and force failures arise from the distinctive structure
+      of force signals. We address each failure mode with a targeted mechanism and combine them into
+      FACT, which achieves 66% average success rate across five contact-rich tasks against 41% for
+      the best prior baseline, in an evaluation spanning almost 2,500 real-world rollouts.
+    </p>
+  </div>
+</section>
+
+<!-- ============ DIAGNOSIS ============ -->
+<section class="pad-tight" id="diagnosis" style="background:#fbfbf9;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)" data-screen-label="Diagnosis">
+  <div class="wrap">
+    <div class="sec-head sec-head-wide reveal">
+      <div class="eyebrow">Diagnosis</div>
+      <p class="lede">Compared to general manipulation tasks, contact-rich tasks require both fine-grained correction and reasoning about contact forces. Below, we illustrate these requirements through plug insertion, contrasting a successful execution with two distinct failure modes: precision failure and force failure.</p>
+    </div>
+
+    <div class="tript" id="tript">
+      <div class="diag reveal">
+        <div class="vid">
+          <video data-auto muted loop playsinline preload="auto"
+                 src="assets/videos/plug-full-insertion.mp4"
+                 data-plain="assets/videos/plug-full-insertion.mp4"
+                 data-force="assets/videos/plug-success.mp4"></video>
+        </div>
+        <div class="body">
+          <h4>Success</h4>
+          <p>The plug approaches, aligns with the socket, enters and fully seats.</p>
+        </div>
+      </div>
+      <div class="diag reveal">
+        <div class="vid">
+          <video data-auto muted loop playsinline preload="auto"
+                 src="assets/videos/plug-misalignment.mp4"
+                 data-plain="assets/videos/plug-misalignment.mp4"
+                 data-force="assets/videos/plug-precision-failure.mp4"></video>
+        </div>
+        <div class="body">
+          <h4>Precision failure</h4>
+          <p>The policy fails to align the plug with the socket and stalls at the rim.</p>
+        </div>
+      </div>
+      <div class="diag reveal">
+        <div class="vid">
+          <video data-auto muted loop playsinline preload="auto"
+                 src="assets/videos/plug-insufficient-force.mp4"
+                 data-plain="assets/videos/plug-insufficient-force.mp4"
+                 data-force="assets/videos/plug-force-failure.mp4"></video>
+        </div>
+        <div class="body">
+          <h4>Force failure</h4>
+          <p>The policy aligns the plug with the socket, but then fails to detect when the plug is fully seated.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="diag-toggle reveal">
+      <button type="button" class="fp-switch" id="fp-switch" aria-pressed="false">
+        <span class="fp-track" aria-hidden="true"><span class="fp-knob"></span></span>
+        Show force profile
+      </button>
+    </div>
+
+    <p class="lede bridge reveal">Tracing each failure mode back to its root cause reveals two distinct sets of properties. One is rooted in how flow-matching policies are trained, the other in the structure of force signals themselves.</p>
+
+    <div class="method" style="margin-top:28px">
+      <div class="mcard reveal">
+        <div class="k">Precision failures</div>
+        <ul class="pill-list">
+          <li><span class="mk"></span><span><b>Delta collapse.</b> In free space, action deltas are large and variable. During contact they collapse to near zero, and this low-delta regime must be reproduced precisely at the moment visual feedback is least informative.</span></li>
+          <li><span class="mk"></span><span><b>Training starvation.</b> Fine-grained corrections are generated in the low-τ denoising regime. Commonly used Beta noise schedules in VLAs such as π₀ <a class="cite" href="#ref-1">[1]</a>, π₀.₅ <a class="cite" href="#ref-2">[2]</a>, GR00T N1 <a class="cite" href="#ref-3">[3]</a>, and SmolVLA <a class="cite" href="#ref-4">[4]</a> allocate little gradient signal there, starving the contact-correction regime.</span></li>
+        </ul>
+      </div>
+      <div class="mcard reveal">
+        <div class="k">Force failures</div>
+        <ul class="pill-list">
+          <li><span class="mk"></span><span><b>Contact sparsity.</b> Force signals are approximately zero over free-space timesteps and become informative only during short contact intervals. Near-zero samples can dominate the objective and bias gradients toward ignoring force.</span></li>
+          <li><span class="mk"></span><span><b>Temporal structure.</b> The instantaneous measurement encodes the current interaction state. Recent history encodes the dynamics that led to it, so omitting either timescale discards task-relevant contact information.</span></li>
+          <li><span class="mk"></span><span><b>Sensitivity modulation.</b> The influence of force should depend on contact state. In free space, force readings should be effectively ignored, whereas at contact even small deviations should trigger corrective actions.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section class="pad-tight" id="method" data-screen-label="Approach">
+  <div class="wrap">
+    <div class="sec-head sec-head-wide reveal">
+      <div class="eyebrow">Approach</div>
+      <p class="lede">Each failure mode is addressed with a targeted mechanism, and together they form
+        <b>FACT</b>, <b>F</b>orce-<b>A</b>ware <b>C</b>ontact-rich manipulation via <b>T</b>imestep modulation.
+        Both preserve the base VLA architecture, require no additional data, and add negligible inference-time overhead.</p>
+    </div>
+
+    <div class="fixstack">
+      <div class="mcard reveal">
+        <div class="k">Precision · Logit-Normal noise schedule</div>
+        <p>We propose to improve the learning of sub-millimeter actions by reinforcing the low-noise, fine-correction regime. Specifically, we replace the Beta schedule with the Logit-Normal schedule, biasing the noise distribution towards the contact-rich regime. With mode m=1.5 instead of m=0, LN allocates 6× more gradient signal to τ &lt; 0.2 than the Beta schedule. Critically, LN requires no changes to the model architecture, no additional training data, and no extra parameters, making it directly applicable to any flow-matching VLA.</p>
+        <div class="figbox" id="sched-fig">
+          <svg id="sched-chart" role="img" aria-label="Logit-Normal vs Beta noise schedule densities"></svg>
+
+          <div class="sched-ctrl">
+            <div class="sc-group">
+              <div class="sc-head"><i class="sc-key" style="background:var(--beta)"></i> Beta</div>
+              <label class="sc-row">
+                <span class="sc-lab">Shape <i>α</i></span>
+                <input type="range" id="sc-a" min="0.5" max="2" step="0.1" value="1.5" />
+                <output class="sc-val" id="sc-a-out">1.5</output>
+              </label>
+              <label class="sc-row">
+                <span class="sc-lab">Shape <i>β</i></span>
+                <input type="range" id="sc-b" min="0.5" max="1.5" step="0.1" value="1.0" />
+                <output class="sc-val" id="sc-b-out">1.0</output>
+              </label>
+            </div>
+
+            <div class="sc-group">
+              <div class="sc-head"><i class="sc-key" style="background:var(--ln)"></i> Logit-Normal</div>
+              <label class="sc-row">
+                <span class="sc-lab">Mode <i>m</i></span>
+                <input type="range" id="sc-m" min="-1" max="2" step="0.1" value="1.5" />
+                <output class="sc-val" id="sc-m-out">1.5</output>
+              </label>
+              <label class="sc-row">
+                <span class="sc-lab">Scale <i>s</i></span>
+                <input type="range" id="sc-s" min="0.5" max="1.5" step="0.05" value="1.0" />
+                <output class="sc-val" id="sc-s-out">1.00</output>
+              </label>
+            </div>
+
+            <div class="sc-foot">
+              <span class="sc-read">LN allocates <b id="sc-ratio">6.0×</b> the gradient signal of Beta below <span id="sc-tau">τ = 0.20</span></span>
+              <button type="button" class="sc-reset" id="sc-reset">Reset to paper</button>
+            </div>
+          </div>
+          <div class="chart-cap">Gradient-signal density over noise level τ. Drag to explore the schedule.</div>
+        </div>
+      </div>
+
+      <div class="mcard reveal">
+        <div class="k">Force · Time-aware force injection</div>
+        <p>Three design choices, one per force-failure property.</p>
+        <div class="arch-tabs" id="arch-list" role="tablist" aria-label="Architecture components">
+          <button type="button" class="arch-opt" role="tab" data-arch="state" aria-selected="true">Contact state</button>
+          <button type="button" class="arch-opt" role="tab" data-arch="history" aria-selected="false">Contact history</button>
+          <button type="button" class="arch-opt" role="tab" data-arch="gating" aria-selected="false">Contact gating</button>
+        </div>
+        <p class="arch-desc" id="arch-desc"></p>
+        <div class="archfig" id="archfig" style="margin-top:18px">
+          <img id="arch-img" src="assets/icons/contact_state.png" alt="Contact state injected into AdaRMSNorm layers" />
+          <p class="arch-note" id="arch-note" hidden></p>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="prose left full reveal" style="margin-top:28px">
+      For the full ablation study and hyperparameter details, please refer to
+      the <a href="#" data-link="paper">paper</a>.
+    </p>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section class="pad-tight" id="results" style="background:#fbfbf9;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)" data-screen-label="Results">
+  <div class="wrap">
+    <div class="sec-head sec-head-wide reveal">
+      <div class="eyebrow">Results</div>
+      <p class="lede">FACT outperforms every baseline, with consistent gains on both precision- and force-critical tasks.</p>
+    </div>
+
+    <div class="results-grid">
+      <div class="reveal">
+        <div class="barchart" id="barchart">
+          <div class="bar"><div class="col" data-val="39"><span class="val">39%</span></div><div class="lab">π₀.₅ <a class="cite" href="#ref-2">[2]</a></div></div>
+          <div class="bar"><div class="col" data-val="38"><span class="val">38%</span></div><div class="lab">TA-VLA <a class="cite" href="#ref-6">[6]</a></div></div>
+          <div class="bar"><div class="col" data-val="41"><span class="val">41%</span></div><div class="lab">ForceVLA <a class="cite" href="#ref-5">[5]</a></div></div>
+          <div class="bar ln"><div class="col" data-val="56"><span class="val">56%</span></div><div class="lab">π₀.₅ + LN <span class="ours">(ours)</span></div></div>
+          <div class="bar fact"><div class="col" data-val="66"><span class="val">66%</span></div><div class="lab">FACT <span class="ours">(ours)</span></div></div>
+        </div>
+        <p class="tbl-note" style="text-align:center">Average success rate (%) across all five tasks.</p>
+      </div>
+
+      <div class="reveal">
+        <div class="tbl-wrap">
+          <table class="res">
+            <thead>
+              <tr>
+                <th style="text-align:left">Method</th>
+                <th>Plug</th><th>USB</th><th>Button</th><th>Board</th><th>Key</th><th>All <span class="hib" aria-label="higher is better">↑</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th>π₀.₅ <a class="cite" href="#ref-2">[2]</a></th><td class="sr">30.0</td><td class="sr">37.5</td><td class="sr">12.5</td><td class="sr">100</td><td class="sr">15.0</td><td class="sr all">39.0</td></tr>
+              <tr><th>TA-VLA <a class="cite" href="#ref-6">[6]</a></th><td class="sr">30.0</td><td class="sr">25.0</td><td class="sr">20.0</td><td class="sr">97.5</td><td class="sr">15.0</td><td class="sr all">37.5</td></tr>
+              <tr><th>ForceVLA <a class="cite" href="#ref-5">[5]</a></th><td class="sr">32.5</td><td class="sr">37.5</td><td class="sr">12.5</td><td class="sr">77.5</td><td class="sr">42.5</td><td class="sr all">40.5</td></tr>
+              <tr><th>π₀.₅ + LN <span class="ours">(ours)</span></th><td class="sr">50.0</td><td class="sr">47.5</td><td class="sr">57.5</td><td class="sr">87.5</td><td class="sr">37.5</td><td class="sr all">56.0</td></tr>
+              <tr class="fact"><th>FACT <span class="ours">(ours)</span></th><td class="sr">57.5</td><td class="sr">47.5</td><td class="sr">75.0</td><td class="sr">90.0</td><td class="sr">60.0</td><td class="sr all">66.0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tbl-note">Success rate (%) per task. All methods fine-tuned from π₀.₅ with LoRA. Tasks span precision-critical (plug, USB) and force-critical (button, board, key) regimes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GALLERY ============ -->
+<section class="pad-tight" id="gallery" data-screen-label="Rollout gallery">
+  <div class="wrap">
+    <div class="sec-head sec-head-wide reveal">
+      <div class="eyebrow">Rollout Gallery</div>
+      <p class="lede">All experiments are conducted on a Franka Research 3 arm equipped with a wrist-mounted Bota SensONE F/T sensor.</p>
+    </div>
+
+    <div class="reveal">
+      <div class="picker">
+        <div class="pgroup">
+          <span class="plabel">Task</span>
+          <div class="seg tasks" data-key="task">
+            <button data-val="plug" aria-pressed="true" title="Plug"><img src="assets/icons/plug-insertion.svg" alt=""><span class="t-name">Plug</span></button>
+            <button data-val="usb" aria-pressed="false" title="USB"><img src="assets/icons/usb-insertion.svg" alt=""><span class="t-name">USB</span></button>
+            <button data-val="button" aria-pressed="false" title="Button"><img src="assets/icons/button-pushing.svg" alt=""><span class="t-name">Button</span></button>
+            <button data-val="key" aria-pressed="false" title="Key"><img src="assets/icons/key-insertion.svg" alt=""><span class="t-name">Key</span></button>
+            <button data-val="board" aria-pressed="false" title="Board"><img src="assets/icons/board-erasing.svg" alt=""><span class="t-name">Board</span></button>
+          </div>
+        </div>
+        <div class="pgroup">
+          <span class="plabel">Policy</span>
+          <div class="seg methods" data-key="method">
+            <button data-val="FACT" data-m="FACT" aria-pressed="true">FACT</button>
+            <button data-val="ForceVLA" data-m="ForceVLA" aria-pressed="false">ForceVLA</button>
+            <button data-val="TAVLA" data-m="TAVLA" aria-pressed="false">TA-VLA</button>
+          </div>
+        </div>
+        <div class="pgroup">
+          <span class="plabel">Outcome</span>
+          <div class="seg outcome" data-key="outcome">
+            <button data-val="success" data-o="success" aria-pressed="true">Success</button>
+            <button data-val="failure" data-o="failure" aria-pressed="false">Failure</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="views">
+          <div class="view">
+            <video data-view="external" muted playsinline preload="auto"></video>
+            <span class="vtag">External</span>
+          </div>
+          <div class="view">
+            <video data-view="wrist" muted playsinline preload="auto"></video>
+            <span class="vtag">Wrist</span>
+          </div>
+        </div>
+        <div class="pause-ic"></div>
+        <button type="button" class="replay" id="replay" aria-label="Replay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg>
+          <span>Replay</span>
+        </button>
+        <div class="missing"><span class="msg"></span></div>
+      </div>
+      <p class="gallery-note">Click to pause · both views are the same rollout, synced</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REFERENCES ============ -->
+<section class="pad-tight" id="references" style="background:#fbfbf9;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)" data-screen-label="References">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">References</div>
+    </div>
+    <ol class="reflist reveal">
+      <li id="ref-1">K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π<sub>0</sub>: A vision-language-action flow model for general robot control</a>. arXiv preprint arXiv:2410.24164, 2024.</li>
+      <li id="ref-2">P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, et al. <a href="https://arxiv.org/abs/2504.16054" target="_blank" rel="noopener">π<sub>0.5</sub>: A vision-language-action model with open-world generalization</a>. arXiv preprint arXiv:2504.16054, 2025.</li>
+      <li id="ref-3">J. Bjorck, F. Castañeda, N. Cherniadev, X. Da, R. Ding, L. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, et al. <a href="https://arxiv.org/abs/2503.14734" target="_blank" rel="noopener">GR00T N1: An open foundation model for generalist humanoid robots</a>. arXiv preprint arXiv:2503.14734, 2025.</li>
+      <li id="ref-4">M. Shukor, D. Aubakirova, F. Capuano, P. Kooijmans, S. Palma, A. Zouitine, M. Aractingi, C. Pascal, M. Russi, A. Marafioti, et al. <a href="https://arxiv.org/abs/2506.01844" target="_blank" rel="noopener">SmolVLA: A vision-language-action model for affordable and efficient robotics</a>. arXiv preprint arXiv:2506.01844, 2025.</li>
+      <li id="ref-5">J. Yu, H. Liu, Q. Yu, J. Ren, C. Hao, H. Ding, G. Huang, G. Huang, Y. Song, P. Cai, et al. <a href="https://arxiv.org/abs/2505.22159" target="_blank" rel="noopener">ForceVLA: Enhancing VLA models with a force-aware MoE for contact-rich manipulation</a>. arXiv preprint arXiv:2505.22159, 2025.</li>
+      <li id="ref-6">Z. Zhang, H. Xu, Z. Yang, C. Yue, Z. Lin, H.-a. Gao, Z. Wang, and H. Zhao. <a href="https://arxiv.org/abs/2509.07962" target="_blank" rel="noopener">TA-VLA: Elucidating the design space of torque-aware vision-language-action models</a>. In <i>9th Conference on Robot Learning (CoRL)</i>, 2025.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ BIBTEX ============ -->
+<section class="pad-tight" id="bibtex" data-screen-label="BibTeX">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">BibTeX</div>
+    </div>
+    <div class="bibtex reveal">
+      <div class="bar"><span>Cite this work</span><button class="copy">copy</button></div>
+      <pre id="bib-src"><span class="key">@article</span>{fact2026,
+  <span class="fld">title</span>   = {When and Why VLAs Fail at Contact-Rich Manipulation, and How to Fix Them},
+  <span class="fld">author</span>  = {Anonymous},
+  <span class="fld">journal</span> = {arXiv preprint arXiv:XXXX.XXXXX},
+  <span class="fld">year</span>    = {2026},
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ACKNOWLEDGEMENTS ============ -->
+<section class="pad-tight" id="acknowledgements" style="background:#fbfbf9;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)" data-screen-label="Acknowledgements">
+  <div class="wrap">
+    <div class="sec-head sec-head-wide reveal">
+      <div class="eyebrow">Acknowledgements</div>
+    </div>
+    <p class="prose left full reveal">
+      This work was supported in part by Agile Robotics. Carlota Parés-Morlans is supported by a
+      graduate fellowship from Knight-Hennessy Scholars at Stanford University. Nils Kuhn is supported
+      by scholarships from the Friedrich Ebert Foundation and the German Academic Exchange Service (DAAD).
+      Alberta Longhini is supported by a Wallenberg–Bienenstock Postdoctoral Fellowship.
+    </p>
+    <p class="prose left full reveal" style="margin-top:12px">
+      We thank Hila Chefer for helpful discussions, and Michelle Yi for discussions on environment
+      setup, data collection, and camera footage for figures.
+    </p>
+  </div>
+</section>
+
+<!-- ============ BACK TO TOP ============ -->
+<button id="toTop" class="to-top" aria-label="Back to top" title="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="wrap">
+    <a class="foot-logo" href="https://iprl.stanford.edu/" target="_blank" rel="noopener">
+      <img src="assets/icons/iprl_logo.png" alt="Stanford IPRL — Interactive Perception and Robot Learning Lab" />
+    </a>
+    <p class="foot-legal">© 2026. All rights reserved.</p>
+    <p class="foot-contact">Contact: cpares [at] stanford [dot] edu</p>
+  </div>
+</footer>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#ffffff"/>
+    <rect x="28" y="28" width="44" height="44" rx="6" fill="#0ea66b"/>
+    <text x="50" y="59" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="#ffffff" text-anchor="middle">F</text>
+  </svg>
+</template>
+
+<script src="assets/js/base.js"></script>
+</body>
+</html>
