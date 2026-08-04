@@ -19,6 +19,7 @@ import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.droid_policy as droid_policy
+import openpi.policies.fact_policy as fact_policy
 import openpi.policies.libero_policy as libero_policy
 import openpi.shared.download as _download
 import openpi.shared.normalize as _normalize
@@ -86,6 +87,14 @@ class DataConfig:
     # sequence is defined by the `action_horizon` field in the model config. This should be adjusted if your
     # LeRobot dataset is using different keys to represent the action.
     action_sequence_keys: Sequence[str] = ("actions",)
+
+    # Names of keys whose past history will be loaded by the data loader. For each key, the data loader will
+    # append negative delta_timestamps offsets covering `history_window` steps (including current step).
+    # If a key also appears in action_sequence_keys, the history and future offsets are merged into a single
+    # combined sequence: shape (history_window - 1 + action_horizon, ...).
+    history_sequence_keys: Sequence[str] = ()
+    # Number of past steps (including current) to include for history_sequence_keys.
+    history_window: int = 0
 
     # If true, will use the LeRobot dataset task to define the prompt.
     prompt_from_task: bool = False
@@ -356,6 +365,124 @@ class LeRobotLiberoDataConfig(DataConfigFactory):
 
 
 @dataclasses.dataclass(frozen=True)
+class LeRobotFACTDeltaDataConfig(DataConfigFactory):
+    """Data config that trains with delta actions (action - current_ee_state).
+
+    Uses FACTDeltaInputs which reorders state to [ee_pos(3), rot6(6), gripper(1), q(7)]
+    so that state[:10] aligns with the action layout. q is always included.
+
+    Delta mask: ee_pos(3) + rot6(6) -> delta, gripper(1) -> absolute.
+    """
+
+    @override
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
+        repack_transform = _transforms.Group(
+            inputs=[
+                _transforms.RepackTransform(
+                    {
+                        "observation/left_image": "left_image",
+                        "observation/wrist_image": "wrist_image",
+                        "observation/state": "state",
+                        "actions": "actions",
+                        "prompt": "task",
+                    }
+                )
+            ]
+        )
+
+        # ee_pos(3) + rot6(6) -> delta, gripper(1) -> absolute
+        delta_mask = _transforms.make_bool_mask(9, -1)
+
+        data_transforms = _transforms.Group(
+            inputs=[fact_policy.FACTDeltaInputs(model_type=model_config.model_type)],
+            outputs=[fact_policy.FACTOutputs()],
+        )
+        data_transforms = data_transforms.push(
+            inputs=[_transforms.DeltaActions(delta_mask)],
+            outputs=[_transforms.AbsoluteActions(delta_mask)],
+        )
+
+        model_transforms = ModelTransformFactory()(model_config)
+
+        return dataclasses.replace(
+            self.create_base_config(assets_dirs, model_config),
+            repack_transforms=repack_transform,
+            data_transforms=data_transforms,
+            model_transforms=model_transforms,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class LeRobotFACTDataConfig(DataConfigFactory):
+    """Data config for FACT.
+
+    Two force streams:
+      ft_current (ft_window * ft_out_dim,): current burst → adaRMS conditioning.
+      ft_history (ft_history_steps * ft_window * ft_out_dim,): past N bursts → suffix tokens.
+
+    force_torque is in history_sequence_keys with history_window = ft_history_steps + 1,
+    so the loader returns (ft_history_steps+1, ft_window, ft_out_dim).
+
+    Requires Pi0Config(pi05=True, force_adarms=True, ft_history_steps>0).
+    """
+
+
+    @override
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
+        if not isinstance(model_config, pi0_config.Pi0Config):
+            raise ValueError("LeRobotFACTDataConfig requires Pi0Config.")
+        if model_config.ft_history_steps <= 0:
+            raise ValueError("LeRobotFACTDataConfig requires model.ft_history_steps > 0.")
+
+        repack_transform = _transforms.Group(
+            inputs=[
+                _transforms.RepackTransform(
+                    {
+                        "observation/left_image": "left_image",
+                        "observation/wrist_image": "wrist_image",
+                        "observation/state": "state",
+                        "observation/ft_sequence": "force_torque",
+                        "actions": "actions",
+                        "prompt": "task",
+                    }
+                )
+            ]
+        )
+
+        delta_mask = _transforms.make_bool_mask(9, -1)
+
+        data_transforms = _transforms.Group(
+            inputs=[fact_policy.FACTInputs(
+                model_type=model_config.model_type,
+                ft_history_steps=model_config.ft_history_steps,
+                ft_window=model_config.ft_window,
+                ft_out_dim=model_config.ft_out_dim,
+            )],
+            outputs=[fact_policy.FACTOutputs()],
+        )
+        data_transforms = data_transforms.push(
+            inputs=[_transforms.DeltaActions(delta_mask)],
+            outputs=[_transforms.AbsoluteActions(delta_mask)],
+        )
+
+        # FlattenFTKeys runs after Normalize (model transforms follow normalization):
+        # per-axis force_torque stats broadcast over the burst keys first, then the
+        # keys are flattened to the widths the model expects.
+        model_transforms = ModelTransformFactory()(model_config).push(
+            inputs=[_transforms.FlattenFTKeys(ft_out_dim=model_config.ft_out_dim)]
+        )
+
+        return dataclasses.replace(
+            self.create_base_config(assets_dirs, model_config),
+            repack_transforms=repack_transform,
+            data_transforms=data_transforms,
+            model_transforms=model_transforms,
+            history_sequence_keys=("force_torque",),
+            history_window=model_config.ft_history_steps + 1,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
 class RLDSDroidDataConfig(DataConfigFactory):
     """
     Config for training on DROID, using RLDS data format (for efficient training on larger datasets).
@@ -554,6 +681,35 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.resume and self.overwrite:
             raise ValueError("Cannot resume and overwrite at the same time.")
+        if (
+            isinstance(self.model, pi0_config.Pi0Config)
+            and self.model.force_adarms_cg_threshold > 0.0
+            and not self.model.force_ft_norm_q01
+        ):
+            assets_dir = getattr(getattr(self.data, "assets", None), "assets_dir", None)
+            asset_id = getattr(getattr(self.data, "assets", None), "asset_id", None) or getattr(self.data, "repo_id", None)
+            if assets_dir and asset_id:
+                import json
+                path = pathlib.Path(assets_dir) / asset_id / "norm_stats.json"
+                try:
+                    with open(path) as f:
+                        ft_stats = json.load(f)["norm_stats"]["force_torque"]
+                    object.__setattr__(self, "model", dataclasses.replace(
+                        self.model,
+                        force_ft_norm_q01=tuple(ft_stats["q01"]),
+                        force_ft_norm_q99=tuple(ft_stats["q99"]),
+                    ))
+                    logging.info(f"Auto-loaded force norm stats from {path}")
+                except (FileNotFoundError, KeyError) as err:
+                    raise ValueError(
+                        "force_torque normalization stats are required for force_adarms_cg_threshold. "
+                        f"Expected them at {path}."
+                    ) from err
+            else:
+                raise ValueError(
+                    "force_torque normalization stats are required for force_adarms_cg_threshold. "
+                    "Configure data.assets.assets_dir and data.assets.asset_id."
+                )
 
 
 # Use `get_config` if you need to get a config by name in your code.
@@ -696,6 +852,66 @@ _CONFIGS = [
         # Turn off EMA for LoRA finetuning.
         ema_decay=None,
     ),
+    TrainConfig(
+        name="pi05_ln_fact_delta_low_mem_finetune",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+            use_ln_scheduler=True,
+            ln_alpha=1.5,
+            ln_sigma=1.0,
+        ),
+        data=LeRobotFACTDeltaDataConfig(
+            repo_id="DATASET_NAME",
+            base_config=DataConfig(prompt_from_task=True),
+            assets=AssetsConfig(
+                assets_dir="PATH",
+                asset_id="DATASET_NAME",
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+        num_train_steps=30_000,
+        freeze_filter=pi0_config.Pi0Config(
+            pi05=True, paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+        ).get_freeze_filter(),
+        ema_decay=None,
+    ),
+    TrainConfig(
+        name="pi05_full_fact_fact_delta_low_mem_finetune",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+            use_ln_scheduler=True,
+            ln_alpha=1.5,
+            ln_sigma=1.0,
+            force_adarms=True,
+            ft_window=27,
+            ft_out_dim=6,
+            ft_tcn_hidden=64,
+            ft_history_steps=30,
+            force_adarms_cg_threshold=0.5,
+        ),
+        data=LeRobotFACTDataConfig(
+            repo_id="DATASET_NAME",
+            base_config=DataConfig(prompt_from_task=True),
+            assets=AssetsConfig(
+                assets_dir="PATH",
+                asset_id="DATASET_NAME",
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "gs://openpi-assets/checkpoints/pi05_base/params",
+            extra_init_regex=".*ft_tcn_encoder.*|.*force_adarms_mlp.*|.*force_gamma_proj.*",
+        ),
+        num_train_steps=30_000,
+        freeze_filter=pi0_config.Pi0Config(
+            pi05=True, paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+        ).get_freeze_filter(),
+        ema_decay=None,
+    ),
+
     TrainConfig(
         name="pi0_fast_libero",
         # Here is an example of loading a pi0-FAST model for full finetuning.

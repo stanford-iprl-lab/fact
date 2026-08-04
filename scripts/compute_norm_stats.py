@@ -86,31 +86,44 @@ def create_rlds_dataloader(
     return data_loader, num_batches
 
 
-def main(config_name: str, max_frames: int | None = None):
-    config = _config.get_config(config_name)
-    data_config = config.data.create(config.assets_dirs, config.model)
-
+def _run_norm_stats(data_config, model_config, batch_size, num_workers, action_horizon, assets_dir, max_frames):
     if data_config.rlds_data_dir is not None:
-        data_loader, num_batches = create_rlds_dataloader(
-            data_config, config.model.action_horizon, config.batch_size, max_frames
-        )
+        data_loader, num_batches = create_rlds_dataloader(data_config, action_horizon, batch_size, max_frames)
     else:
         data_loader, num_batches = create_torch_dataloader(
-            data_config, config.model.action_horizon, config.batch_size, config.model, config.num_workers, max_frames
+            data_config, action_horizon, batch_size, model_config, num_workers, max_frames
         )
 
-    keys = ["state", "actions"]
-    stats = {key: normalize.RunningStats() for key in keys}
+    tracked_keys = ["state", "actions"]
+    stats: dict[str, normalize.RunningStats] = {}
 
     for batch in tqdm.tqdm(data_loader, total=num_batches, desc="Computing stats"):
-        for key in keys:
-            stats[key].update(np.asarray(batch[key]))
+        for key in tracked_keys:
+            if key in batch:
+                if key not in stats:
+                    stats[key] = normalize.RunningStats()
+                stats[key].update(np.asarray(batch[key]))
 
-    norm_stats = {key: stats.get_statistics() for key, stats in stats.items()}
+        ft_stats_source = "ft_current" if "ft_current" in batch else "force_torque"
+        if ft_stats_source in batch:
+            if "force_torque" not in stats:
+                stats["force_torque"] = normalize.RunningStats()
+            stats["force_torque"].update(np.asarray(batch[ft_stats_source]))
 
-    output_path = config.assets_dirs / data_config.repo_id
+    norm_stats = {key: s.get_statistics() for key, s in stats.items()}
+    output_path = assets_dir / data_config.repo_id
     print(f"Writing stats to: {output_path}")
     normalize.save(output_path, norm_stats)
+
+
+def main(config_name: str, max_frames: int | None = None):
+    config = _config.get_config(config_name)
+
+    data_config = config.data.create(config.assets_dirs, config.model)
+    _run_norm_stats(
+        data_config, config.model, config.batch_size, config.num_workers,
+        config.model.action_horizon, config.assets_dirs, max_frames,
+    )
 
 
 if __name__ == "__main__":

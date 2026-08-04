@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import os
 import pathlib
@@ -6,6 +7,7 @@ from typing import Any
 import jax.numpy as jnp
 
 import openpi.models.model as _model
+import openpi.models.pi0_config as pi0_config
 import openpi.policies.policy as _policy
 import openpi.shared.download as download
 from openpi.training import checkpoints as _checkpoints
@@ -49,12 +51,6 @@ def create_trained_policy(
     weight_path = os.path.join(checkpoint_dir, "model.safetensors")
     is_pytorch = os.path.exists(weight_path)
 
-    logging.info("Loading model...")
-    if is_pytorch:
-        model = train_config.model.load_pytorch(train_config, weight_path)
-        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
-    else:
-        model = train_config.model.load(_model.restore_params(checkpoint_dir / "params", dtype=jnp.bfloat16))
     data_config = train_config.data.create(train_config.assets_dirs, train_config.model)
     if norm_stats is None:
         # We are loading the norm stats from the checkpoint instead of the config assets dir to make sure
@@ -62,6 +58,33 @@ def create_trained_policy(
         if data_config.asset_id is None:
             raise ValueError("Asset id is required to load norm stats.")
         norm_stats = _checkpoints.load_norm_stats(checkpoint_dir / "assets", data_config.asset_id)
+
+    if (
+        isinstance(train_config.model, pi0_config.Pi0Config)
+        and train_config.model.force_adarms_cg_threshold > 0.0
+        and not train_config.model.force_ft_norm_q01
+    ):
+        if norm_stats is None or (ft_stats := norm_stats.get("force_torque")) is None:
+            raise ValueError("force_torque normalization stats are required for force_adarms_cg_threshold.")
+        model_config = dataclasses.replace(
+            train_config.model,
+            force_ft_norm_q01=tuple(ft_stats.q01),
+            force_ft_norm_q99=tuple(ft_stats.q99),
+        )
+        train_config = dataclasses.replace(train_config, model=model_config)
+        data_config = train_config.data.create(train_config.assets_dirs, model_config)
+
+    logging.info("Loading model...")
+    if is_pytorch:
+        model = train_config.model.load_pytorch(train_config, weight_path)
+        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
+    else:
+        model = train_config.model.load(_model.restore_params(checkpoint_dir / "params", dtype=jnp.bfloat16))
+
+    # FT aliases are input-only. Keep output stats restricted to the keys emitted
+    # by Policy.infer so Unnormalize can retain strict key validation.
+    output_norm_stats = {key: norm_stats[key] for key in ("state", "actions") if key in norm_stats}
+    input_norm_stats = transforms.alias_ft_norm_stats(norm_stats)
 
     # Determine the device to use for PyTorch models
     if is_pytorch and pytorch_device is None:
@@ -78,12 +101,12 @@ def create_trained_policy(
             *repack_transforms.inputs,
             transforms.InjectDefaultPrompt(default_prompt),
             *data_config.data_transforms.inputs,
-            transforms.Normalize(norm_stats, use_quantiles=data_config.use_quantile_norm),
+            transforms.Normalize(input_norm_stats, use_quantiles=data_config.use_quantile_norm),
             *data_config.model_transforms.inputs,
         ],
         output_transforms=[
             *data_config.model_transforms.outputs,
-            transforms.Unnormalize(norm_stats, use_quantiles=data_config.use_quantile_norm),
+            transforms.Unnormalize(output_norm_stats, use_quantiles=data_config.use_quantile_norm),
             *data_config.data_transforms.outputs,
             *repack_transforms.outputs,
         ],

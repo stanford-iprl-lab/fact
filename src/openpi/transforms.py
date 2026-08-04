@@ -111,6 +111,43 @@ class InjectDefaultPrompt(DataTransformFn):
         return data
 
 
+def alias_ft_norm_stats(norm_stats: dict) -> dict:
+    """Alias the per-axis force_torque stats to the FT burst keys.
+
+    ft_current (ft_window, ft_out_dim) and ft_history
+    (steps * ft_window, ft_out_dim) are the same physical signal as force_torque,
+    so they share one per-axis stats entry;
+    Normalize broadcasts it over the leading dims. FlattenFTKeys (applied after
+    Normalize) flattens the burst keys to the widths the model expects.
+    """
+    if norm_stats and "force_torque" in norm_stats:
+        norm_stats = dict(norm_stats)
+        norm_stats.setdefault("ft_current", norm_stats["force_torque"])
+        norm_stats.setdefault("ft_history", norm_stats["force_torque"])
+    return norm_stats
+
+
+@dataclasses.dataclass(frozen=True)
+class FlattenFTKeys(DataTransformFn):
+    """Flatten FT burst keys to the flat vectors the model expects.
+
+    Runs after Normalize so per-axis force_torque stats broadcast over the burst
+    shape first; the model consumes flat (ft_window * ft_out_dim,) and
+    (steps * ft_window * ft_out_dim,) vectors."""
+
+    ft_out_dim: int
+
+    def __call__(self, data: DataDict) -> DataDict:
+        for key in ("ft_current", "ft_history"):
+            if key in data:
+                a = np.asarray(data[key])
+                # Only flatten burst arrays with the configured trailing FT axis;
+                # leave already-flat vectors alone.
+                if a.ndim >= 2 and a.shape[-1] == self.ft_out_dim:
+                    data = {**data, key: a.reshape(*a.shape[:-2], -1)}
+        return data
+
+
 @dataclasses.dataclass(frozen=True)
 class Normalize(DataTransformFn):
     norm_stats: at.PyTree[NormStats] | None
@@ -136,7 +173,9 @@ class Normalize(DataTransformFn):
 
     def _normalize(self, x, stats: NormStats):
         mean, std = stats.mean[..., : x.shape[-1]], stats.std[..., : x.shape[-1]]
-        return (x - mean) / (std + 1e-6)
+        # Avoid amplifying nearly constant dimensions when their estimated standard deviation is tiny or numerically zero.
+        safe_std = np.maximum(std, 1e-2)
+        return (x - mean) / safe_std
 
     def _normalize_quantile(self, x, stats: NormStats):
         assert stats.q01 is not None
@@ -170,7 +209,8 @@ class Unnormalize(DataTransformFn):
     def _unnormalize(self, x, stats: NormStats):
         mean = pad_to_dim(stats.mean, x.shape[-1], axis=-1, value=0.0)
         std = pad_to_dim(stats.std, x.shape[-1], axis=-1, value=1.0)
-        return x * (std + 1e-6) + mean
+        safe_std = np.maximum(std, 1e-2)
+        return x * safe_std + mean
 
     def _unnormalize_quantile(self, x, stats: NormStats):
         assert stats.q01 is not None

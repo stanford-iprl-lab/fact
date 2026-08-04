@@ -138,11 +138,28 @@ def create_torch_dataset(
         return FakeDataset(model_config, num_samples=1024)
 
     dataset_meta = lerobot_dataset.LeRobotDatasetMetadata(repo_id)
+
+    # Build delta_timestamps: future offsets for action_sequence_keys, past offsets for
+    # history_sequence_keys.  If a key appears in both, the offsets are merged into a
+    # single combined list: [-(hw-1)/fps, ..., -1/fps, 0, 1/fps, ..., (ah-1)/fps].
+    # The transform can then slice [:hw] for history and [hw-1:] for future.
+    delta_timestamps: dict[str, list[float]] = {
+        key: [t / dataset_meta.fps for t in range(action_horizon)]
+        for key in data_config.action_sequence_keys
+    }
+    if data_config.history_window > 0:
+        hw = data_config.history_window
+        for key in data_config.history_sequence_keys:
+            hist_offsets = [-(hw - 1 - t) / dataset_meta.fps for t in range(hw)]
+            if key in delta_timestamps:
+                # Merge: prepend past offsets (drop duplicate 0 already in future list)
+                delta_timestamps[key] = hist_offsets[:-1] + delta_timestamps[key]
+            else:
+                delta_timestamps[key] = hist_offsets
+
     dataset = lerobot_dataset.LeRobotDataset(
         data_config.repo_id,
-        delta_timestamps={
-            key: [t / dataset_meta.fps for t in range(action_horizon)] for key in data_config.action_sequence_keys
-        },
+        delta_timestamps=delta_timestamps,
     )
 
     if data_config.prompt_from_task:
@@ -162,10 +179,10 @@ def create_rlds_dataset(
     return DroidRldsDataset(
         data_dir=data_config.rlds_data_dir,
         batch_size=batch_size,
+        datasets=data_config.datasets,
         shuffle=shuffle,
         action_chunk_size=action_horizon,
         action_space=data_config.action_space,
-        datasets=data_config.datasets,
     )
 
 
@@ -178,7 +195,7 @@ def transform_dataset(dataset: Dataset, data_config: _config.DataConfig, *, skip
                 "Normalization stats not found. "
                 "Make sure to run `scripts/compute_norm_stats.py --config-name=<your-config>`."
             )
-        norm_stats = data_config.norm_stats
+        norm_stats = _transforms.alias_ft_norm_stats(data_config.norm_stats)
 
     return TransformedDataset(
         dataset,
@@ -206,7 +223,7 @@ def transform_iterable_dataset(
                 "Normalization stats not found. "
                 "Make sure to run `scripts/compute_norm_stats.py --config-name=<your-config>`."
             )
-        norm_stats = data_config.norm_stats
+        norm_stats = _transforms.alias_ft_norm_stats(data_config.norm_stats)
 
     return IterableTransformedDataset(
         dataset,

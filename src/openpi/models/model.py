@@ -106,6 +106,13 @@ class Observation(Generic[ArrayT]):
     # Token loss mask (for FAST autoregressive model).
     token_loss_mask: at.Bool[ArrayT, "*b l"] | None = None
 
+    # Optional current-step force-torque burst (adaRMS conditioning).
+    ft_current: at.Float[ArrayT, "*b ft"] | None = None
+
+    # Optional force history across N past control steps, each encoded by the shared within-step TCN.
+    # Shape: (*b, ft_history_steps * ft_window * ft_out_dim).  Flattened stack of past raw bursts.
+    ft_history: at.Float[ArrayT, "*b ft_steps_flat"] | None = None
+
     @classmethod
     def from_dict(cls, data: at.PyTree[ArrayT]) -> "Observation[ArrayT]":
         """This method defines the mapping between unstructured data (i.e., nested dict) to the structured Observation format."""
@@ -126,6 +133,8 @@ class Observation(Generic[ArrayT]):
             tokenized_prompt_mask=data.get("tokenized_prompt_mask"),
             token_ar_mask=data.get("token_ar_mask"),
             token_loss_mask=data.get("token_loss_mask"),
+            ft_current=data.get("ft_current"),
+            ft_history=data.get("ft_history"),
         )
 
     def to_dict(self) -> at.PyTree[ArrayT]:
@@ -205,6 +214,8 @@ def preprocess_observation(
         tokenized_prompt_mask=observation.tokenized_prompt_mask,
         token_ar_mask=observation.token_ar_mask,
         token_loss_mask=observation.token_loss_mask,
+        ft_current=observation.ft_current,
+        ft_history=observation.ft_history,
     )
 
 
