@@ -144,8 +144,7 @@ def create_torch_dataset(
     # single combined list: [-(hw-1)/fps, ..., -1/fps, 0, 1/fps, ..., (ah-1)/fps].
     # The transform can then slice [:hw] for history and [hw-1:] for future.
     delta_timestamps: dict[str, list[float]] = {
-        key: [t / dataset_meta.fps for t in range(action_horizon)]
-        for key in data_config.action_sequence_keys
+        key: [t / dataset_meta.fps for t in range(action_horizon)] for key in data_config.action_sequence_keys
     }
     if data_config.history_window > 0:
         hw = data_config.history_window

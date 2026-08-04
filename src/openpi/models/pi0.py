@@ -35,6 +35,7 @@ def ln_sample(
     z = jax.random.normal(rng, shape)
     return jnp.clip(jax.nn.sigmoid(sigma * z - alpha), 0.001, 0.999)
 
+
 class CausalDilatedBlock(nnx.Module):
     """Single causal dilated 1-D conv block with layer-norm and residual connection.
 
@@ -94,11 +95,11 @@ class TCNEncoder(nnx.Module):
         """
         B = x_flat.shape[0]
         x = x_flat.reshape(B, self.window, self.in_dim)  # (B, T, in_dim)
-        x = self.input_proj(x)                              # (B, T, hidden)
+        x = self.input_proj(x)  # (B, T, hidden)
         for block in [self.block0, self.block1, self.block2, self.block3]:
             x = block(x)
-        x = x[:, -1:, :]                                     # (B, 1, hidden)
-        return self.output_proj(x)                            # (B, 1, out_dim)
+        x = x[:, -1:, :]  # (B, 1, hidden)
+        return self.output_proj(x)  # (B, 1, out_dim)
 
 
 def make_attn_mask(input_mask, mask_ar):
@@ -318,7 +319,7 @@ class Pi0(_model.BaseModel):
                     # Contact is determined only by the 3D force vector. Torque
                     # channels still condition adaRMS but do not affect the gate.
                     force_mag = jnp.linalg.norm(ft_for_threshold[..., :3], axis=-1, keepdims=True)  # (B, 1)
-                    is_contact = force_mag > self._force_adarms_cg_threshold                  # (B, 1)
+                    is_contact = force_mag > self._force_adarms_cg_threshold  # (B, 1)
                     ft_gamma = jnp.where(is_contact, ft_gamma, jnp.zeros_like(ft_gamma))
             action_expert_tokens = action_tokens
             if self.force_adarms:

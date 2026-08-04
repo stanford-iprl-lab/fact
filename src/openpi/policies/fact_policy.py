@@ -30,14 +30,12 @@ def _parse_image(image) -> np.ndarray:
 
 @dataclasses.dataclass(frozen=True)
 class FACTOutputs(transforms.DataTransformFn):
-
     def __call__(self, data: dict) -> dict:
         return {"actions": np.asarray(data["actions"][:, :10])}
 
 
 @dataclasses.dataclass(frozen=True)
 class FACTDeltaInputs(transforms.DataTransformFn):
-
     model_type: _model.ModelType
 
     def __call__(self, data: dict) -> dict:
@@ -73,12 +71,11 @@ class FACTDeltaInputs(transforms.DataTransformFn):
 
 @dataclasses.dataclass(frozen=True)
 class FACTInputs(transforms.DataTransformFn):
-    """Input transform for the FACT architecture.
-    """
+    """Input transform for the FACT architecture."""
 
     model_type: _model.ModelType
     ft_history_steps: int  # number of past control steps for suffix tokens
-    ft_window: int = 27           # FT readings per control step
+    ft_window: int = 27  # FT readings per control step
     ft_out_dim: int = 6
 
     def __call__(self, data: dict) -> dict:

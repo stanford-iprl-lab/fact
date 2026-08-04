@@ -121,8 +121,13 @@ def main(config_name: str, max_frames: int | None = None):
 
     data_config = config.data.create(config.assets_dirs, config.model)
     _run_norm_stats(
-        data_config, config.model, config.batch_size, config.num_workers,
-        config.model.action_horizon, config.assets_dirs, max_frames,
+        data_config,
+        config.model,
+        config.batch_size,
+        config.num_workers,
+        config.model.action_horizon,
+        config.assets_dirs,
+        max_frames,
     )
 
 

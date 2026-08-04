@@ -426,7 +426,6 @@ class LeRobotFACTDataConfig(DataConfigFactory):
     Requires Pi0Config(pi05=True, force_adarms=True, ft_history_steps>0).
     """
 
-
     @override
     def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
         if not isinstance(model_config, pi0_config.Pi0Config):
@@ -452,12 +451,14 @@ class LeRobotFACTDataConfig(DataConfigFactory):
         delta_mask = _transforms.make_bool_mask(9, -1)
 
         data_transforms = _transforms.Group(
-            inputs=[fact_policy.FACTInputs(
-                model_type=model_config.model_type,
-                ft_history_steps=model_config.ft_history_steps,
-                ft_window=model_config.ft_window,
-                ft_out_dim=model_config.ft_out_dim,
-            )],
+            inputs=[
+                fact_policy.FACTInputs(
+                    model_type=model_config.model_type,
+                    ft_history_steps=model_config.ft_history_steps,
+                    ft_window=model_config.ft_window,
+                    ft_out_dim=model_config.ft_out_dim,
+                )
+            ],
             outputs=[fact_policy.FACTOutputs()],
         )
         data_transforms = data_transforms.push(
@@ -687,18 +688,25 @@ class TrainConfig:
             and not self.model.force_ft_norm_q01
         ):
             assets_dir = getattr(getattr(self.data, "assets", None), "assets_dir", None)
-            asset_id = getattr(getattr(self.data, "assets", None), "asset_id", None) or getattr(self.data, "repo_id", None)
+            asset_id = getattr(getattr(self.data, "assets", None), "asset_id", None) or getattr(
+                self.data, "repo_id", None
+            )
             if assets_dir and asset_id:
                 import json
+
                 path = pathlib.Path(assets_dir) / asset_id / "norm_stats.json"
                 try:
                     with open(path) as f:
                         ft_stats = json.load(f)["norm_stats"]["force_torque"]
-                    object.__setattr__(self, "model", dataclasses.replace(
-                        self.model,
-                        force_ft_norm_q01=tuple(ft_stats["q01"]),
-                        force_ft_norm_q99=tuple(ft_stats["q99"]),
-                    ))
+                    object.__setattr__(
+                        self,
+                        "model",
+                        dataclasses.replace(
+                            self.model,
+                            force_ft_norm_q01=tuple(ft_stats["q01"]),
+                            force_ft_norm_q99=tuple(ft_stats["q99"]),
+                        ),
+                    )
                     logging.info(f"Auto-loaded force norm stats from {path}")
                 except (FileNotFoundError, KeyError) as err:
                     raise ValueError(
@@ -911,7 +919,6 @@ _CONFIGS = [
         ).get_freeze_filter(),
         ema_decay=None,
     ),
-
     TrainConfig(
         name="pi0_fast_libero",
         # Here is an example of loading a pi0-FAST model for full finetuning.

@@ -25,17 +25,16 @@ class Pi0Config(_model.BaseModelConfig):
     action_dim: int = 32
     action_horizon: int = 50
     max_token_len: int = None  # type: ignore
-    
-    ft_window: int = 27         # history window length shared by FT and state TCN encoders
-    ft_out_dim: int = 6         # FT vector dimension per timestep (6 for 6-axis sensor)
-    ft_tcn_hidden: int = 64     # TCN internal hidden channels
-    ft_history_steps: int = 0   # 0 = disabled; > 0 = number of past steps to encode
 
-    use_ln_scheduler: bool = False   # use LN instead of Beta
+    ft_window: int = 27  # history window length shared by FT and state TCN encoders
+    ft_out_dim: int = 6  # FT vector dimension per timestep (6 for 6-axis sensor)
+    ft_tcn_hidden: int = 64  # TCN internal hidden channels
+    ft_history_steps: int = 0  # 0 = disabled; > 0 = number of past steps to encode
+
+    use_ln_scheduler: bool = False  # use LN instead of Beta
     ln_alpha: float = 1.5
     ln_sigma: float = 1.0
 
-   
     force_adarms: bool = False
     force_adarms_cg_threshold: float = 0.0
     force_ft_norm_q01: tuple[float, ...] = ()
@@ -68,8 +67,7 @@ class Pi0Config(_model.BaseModelConfig):
         if self.force_ft_norm_q01:
             if len(self.force_ft_norm_q01) != self.ft_out_dim or len(self.force_ft_norm_q99) != self.ft_out_dim:
                 raise ValueError(
-                    "force_ft_norm_q01 and force_ft_norm_q99 must each have length ft_out_dim "
-                    f"({self.ft_out_dim})."
+                    "force_ft_norm_q01 and force_ft_norm_q99 must each have length ft_out_dim " f"({self.ft_out_dim})."
                 )
         if self.pytorch_compile_mode is not None:
             assert self.pytorch_compile_mode in [
