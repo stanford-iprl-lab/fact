@@ -291,6 +291,31 @@ p.bridge {
 }
 .btn.is-disabled:hover { background: var(--panel); border-color: var(--hair); }
 .btn.is-disabled .ic { opacity: .55; }
+/* "coming soon" tooltip on the disabled Code button (hover + keyboard focus) */
+.btn[data-tip]{ position: relative; }
+.btn[data-tip]::after{
+  content: attr(data-tip);
+  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%) translateY(4px);
+  padding: 6px 11px; border-radius: 7px; white-space: nowrap;
+  background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em;
+  box-shadow: 0 6px 18px rgba(22,24,29,0.22);
+  opacity: 0; pointer-events: none; transition: opacity .16s ease, transform .16s ease;
+}
+/* little pointer under the bubble */
+.btn[data-tip]::before{
+  content: ""; position: absolute; left: 50%; bottom: calc(100% + 3px);
+  transform: translateX(-50%) translateY(4px);
+  border: 5px solid transparent; border-top-color: var(--ink);
+  opacity: 0; pointer-events: none; transition: opacity .16s ease, transform .16s ease;
+}
+.btn[data-tip]:hover::after, .btn[data-tip]:focus-visible::after,
+.btn[data-tip]:hover::before, .btn[data-tip]:focus-visible::before{
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+@media (hover: none){
+  /* touch devices can't hover — reveal the tip on tap/focus instead */
+  .btn[data-tip]:active::after, .btn[data-tip]:active::before { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 
 /* ---------- montage ---------- */
 .montage { margin-top: clamp(36px, 5vw, 60px); }
