@@ -17,6 +17,15 @@ def test_pi0_full_finetune():
     assert len(state) == 0
 
 
+def test_force_normalization_stats_are_static():
+    config = _pi0_config.Pi0Config(
+        force_ft_norm_q01=(-1.0,) * 6,
+        force_ft_norm_q99=(1.0,) * 6,
+    )
+    state = _get_frozen_state(config)
+    assert len(state) == 0
+
+
 def test_pi0_gemma_lora():
     config = _pi0_config.Pi0Config(paligemma_variant="gemma_2b_lora")
     state = _get_frozen_state(config)

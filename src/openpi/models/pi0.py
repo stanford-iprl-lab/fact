@@ -16,6 +16,92 @@ from openpi.shared import array_typing as at
 logger = logging.getLogger("openpi")
 
 
+def ln_sample(
+    rng: at.KeyArrayLike,
+    shape: tuple,
+    alpha: float = 1.5,
+    sigma: float = 1.0,
+) -> at.Float[at.Array, "..."]:
+    """Logit-Normal (LN) noise time sampler.
+
+    Args:
+        rng: JAX random key.
+        shape: Output shape tuple.
+        alpha: Logit-normal shift.
+        sigma: Standard deviation of the logit-normal.
+    Returns:
+        Float array of shape ``shape`` with values in (0.001, 0.999).
+    """
+    z = jax.random.normal(rng, shape)
+    return jnp.clip(jax.nn.sigmoid(sigma * z - alpha), 0.001, 0.999)
+
+
+class CausalDilatedBlock(nnx.Module):
+    """Single causal dilated 1-D conv block with layer-norm and residual connection.
+
+    Input / output shape: ``(B, T, hidden)``.
+    Causal masking is enforced by left-only padding of ``(kernel_size-1)*dilation``
+    steps; the right side is never padded.
+    """
+
+    def __init__(self, hidden: int, kernel_size: int, dilation: int, rngs: nnx.Rngs):
+        left_pad = (kernel_size - 1) * dilation
+        self.conv = nnx.Conv(
+            hidden,
+            hidden,
+            kernel_size=(kernel_size,),
+            strides=(1,),
+            padding=((left_pad, 0),),
+            kernel_dilation=(dilation,),
+            rngs=rngs,
+        )
+        self.norm = nnx.LayerNorm(hidden, rngs=rngs)
+
+    def __call__(self, x: jax.Array) -> jax.Array:  # (B, T, C) → (B, T, C)
+        return x + nnx.swish(self.norm(self.conv(x)))
+
+
+class TCNEncoder(nnx.Module):
+    """Temporal convolutional network (TCN) for history sequences.
+
+    Encodes a flattened window ``(B, window * in_dim)`` into one final-summary
+    token ``(B, 1, out_dim)`` using a stack of causal dilated 1-D conv blocks.
+
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        window: int,
+        hidden: int,
+        out_dim: int,
+        rngs: nnx.Rngs,
+    ):
+        self.in_dim = in_dim
+        self.window = window
+        self.input_proj = nnx.Conv(in_dim, hidden, kernel_size=(1,), rngs=rngs)
+        self.block0 = CausalDilatedBlock(hidden, kernel_size=3, dilation=1, rngs=rngs)
+        self.block1 = CausalDilatedBlock(hidden, kernel_size=3, dilation=2, rngs=rngs)
+        self.block2 = CausalDilatedBlock(hidden, kernel_size=3, dilation=4, rngs=rngs)
+        self.block3 = CausalDilatedBlock(hidden, kernel_size=3, dilation=8, rngs=rngs)
+        self.output_proj = nnx.Linear(hidden, out_dim, rngs=rngs)
+
+    def __call__(self, x_flat: jax.Array) -> jax.Array:
+        """
+        Args:
+            x_flat: ``(B, window * in_dim)`` flattened history sequence.
+        Returns:
+            ``(B, 1, out_dim)`` final-summary token array.
+        """
+        batch_size = x_flat.shape[0]
+        x = x_flat.reshape(batch_size, self.window, self.in_dim)  # (B, T, in_dim)
+        x = self.input_proj(x)  # (B, T, hidden)
+        for block in [self.block0, self.block1, self.block2, self.block3]:
+            x = block(x)
+        x = x[:, -1:, :]  # (B, 1, hidden)
+        return self.output_proj(x)  # (B, 1, out_dim)
+
+
 def make_attn_mask(input_mask, mask_ar):
     """Adapted from big_vision.
 
@@ -67,6 +153,17 @@ class Pi0(_model.BaseModel):
     def __init__(self, config: pi0_config.Pi0Config, rngs: nnx.Rngs):
         super().__init__(config.action_dim, config.action_horizon, config.max_token_len)
         self.pi05 = config.pi05
+        self.use_ln_scheduler = config.use_ln_scheduler
+        self.ln_alpha = config.ln_alpha
+        self.ln_sigma = config.ln_sigma
+        self.ft_out_dim = config.ft_out_dim
+        self.force_adarms = config.force_adarms
+        self._force_adarms_cg_threshold = config.force_adarms_cg_threshold
+        # Keep normalization statistics as static, hashable graph metadata.
+        self._force_ft_norm_q01 = config.force_ft_norm_q01 or None
+        self._force_ft_norm_q99 = config.force_ft_norm_q99 or None
+        self.ft_history_steps = config.ft_history_steps
+
         paligemma_config = _gemma.get_config(config.paligemma_variant)
         action_expert_config = _gemma.get_config(config.action_expert_variant)
         # TODO: rewrite gemma in NNX. For now, use bridge.
@@ -98,6 +195,29 @@ class Pi0(_model.BaseModel):
             self.action_time_mlp_in = nnx.Linear(2 * action_expert_config.width, action_expert_config.width, rngs=rngs)
             self.action_time_mlp_out = nnx.Linear(action_expert_config.width, action_expert_config.width, rngs=rngs)
         self.action_out_proj = nnx.Linear(action_expert_config.width, config.action_dim, rngs=rngs)
+
+        # FT history encoder
+        if config.ft_history_steps > 0:
+            self.ft_tcn_encoder = TCNEncoder(
+                in_dim=config.ft_out_dim,
+                window=config.ft_window,
+                hidden=config.ft_tcn_hidden,
+                out_dim=action_expert_config.width,
+                rngs=rngs,
+            )
+
+        # Force adaRMS encoder
+        # Mean-pools the current burst then projects to adaRMS space.
+        if config.force_adarms:
+            self.force_adarms_mlp_in = nnx.Linear(config.ft_out_dim, action_expert_config.width, rngs=rngs)
+            self.force_adarms_mlp_out = nnx.Linear(action_expert_config.width, action_expert_config.width, rngs=rngs)
+            self.force_gamma_proj = nnx.Linear(
+                action_expert_config.width,
+                action_expert_config.width,
+                kernel_init=nnx.initializers.zeros,
+                bias_init=nnx.initializers.zeros,
+                rngs=rngs,
+            )
 
         # This attribute gets automatically set by model.train() and model.eval().
         self.deterministic = True
@@ -143,18 +263,33 @@ class Pi0(_model.BaseModel):
         at.Float[at.Array, "b s emb"],
         at.Bool[at.Array, "b s"],
         at.Bool[at.Array, " s"],
-        at.Float[at.Array, "b emb"] | None,
+        at.Float[at.Array, "b emb"] | dict | None,
     ]:
+        """Embed state, historical FT tokens, and noisy action tokens.
+
+        The current FT burst conditions Pi0.5 through adaRMS and is not appended
+        to the suffix token sequence.
+        """
         input_mask = []
         ar_mask = []
         tokens = []
+
         if not self.pi05:
-            # add a single state token
+            # Add a single state token.
             state_token = self.state_proj(obs.state)[:, None, :]
             tokens.append(state_token)
             input_mask.append(jnp.ones((obs.state.shape[0], 1), dtype=jnp.bool_))
-            # image/language inputs do not attend to state or actions
             ar_mask += [True]
+
+        if self.ft_history_steps > 0 and obs.ft_history is not None:
+            batch_size = obs.ft_history.shape[0]
+            # Reshape to (B * ft_history_steps, ft_window * ft_out_dim) for batched TCN
+            step_flat = obs.ft_history.reshape(batch_size * self.ft_history_steps, -1)
+            step_tokens = self.ft_tcn_encoder(step_flat).reshape(batch_size, self.ft_history_steps, -1)
+            tokens.append(step_tokens)
+            input_mask.append(jnp.ones((batch_size, self.ft_history_steps), dtype=jnp.bool_))
+            # Start a new ar-block for history tokens (they can all attend to each other)
+            ar_mask += [True] + [False] * (self.ft_history_steps - 1)
 
         action_tokens = self.action_in_proj(noisy_actions)
         # embed timestep using sine-cosine positional encoding with sensitivity in the range [0, 1]
@@ -165,8 +300,29 @@ class Pi0(_model.BaseModel):
             time_emb = nnx.swish(time_emb)
             time_emb = self.time_mlp_out(time_emb)
             time_emb = nnx.swish(time_emb)
+
+            ft_gamma = None
+            if self.force_adarms and obs.ft_current is not None:
+                batch_size = obs.ft_current.shape[0]
+                ft_mean = obs.ft_current.reshape(batch_size, -1, self.ft_out_dim).mean(axis=1)  # (B, ft_out_dim)
+                ft_emb = self.force_adarms_mlp_in(ft_mean)
+                ft_emb = nnx.swish(ft_emb)
+                ft_emb = self.force_adarms_mlp_out(ft_emb)
+                ft_gamma = self.force_gamma_proj(ft_emb)
+                if self._force_adarms_cg_threshold > 0.0:
+                    # Undo quantile normalization to recover raw sensor units.
+                    ft_for_threshold = ft_mean
+                    if self._force_ft_norm_q01 is not None:
+                        q01 = jnp.asarray(self._force_ft_norm_q01, dtype=ft_mean.dtype)
+                        q99 = jnp.asarray(self._force_ft_norm_q99, dtype=ft_mean.dtype)
+                        ft_for_threshold = (ft_mean + 1.0) / 2.0 * (q99 - q01 + 1e-6) + q01
+                    # Contact is determined only by the 3D force vector. Torque
+                    # channels still condition adaRMS but do not affect the gate.
+                    force_mag = jnp.linalg.norm(ft_for_threshold[..., :3], axis=-1, keepdims=True)  # (B, 1)
+                    is_contact = force_mag > self._force_adarms_cg_threshold  # (B, 1)
+                    ft_gamma = jnp.where(is_contact, ft_gamma, jnp.zeros_like(ft_gamma))
             action_expert_tokens = action_tokens
-            adarms_cond = time_emb
+            adarms_cond = {"time": time_emb, "force_gamma": ft_gamma} if self.force_adarms else time_emb
         else:
             # mix timestep + action information using an MLP (no adaRMS)
             time_tokens = einops.repeat(time_emb, "b emb -> b s emb", s=self.action_horizon)
@@ -194,7 +350,10 @@ class Pi0(_model.BaseModel):
 
         batch_shape = actions.shape[:-2]
         noise = jax.random.normal(noise_rng, actions.shape)
-        time = jax.random.beta(time_rng, 1.5, 1, batch_shape) * 0.999 + 0.001
+        if self.use_ln_scheduler:
+            time = ln_sample(time_rng, batch_shape, self.ln_alpha, self.ln_sigma)
+        else:
+            time = jax.random.beta(time_rng, 1.5, 1, batch_shape) * 0.999 + 0.001
         time_expanded = time[..., None, None]
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions

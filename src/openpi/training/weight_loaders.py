@@ -43,15 +43,22 @@ class CheckpointWeightLoader(WeightLoader):
         example: "./checkpoints/<config>/<exp>/<step>/params"
       released checkpoints:
         example: "gs://openpi-assets/checkpoints/<model>/params"
+
+    Args:
+        extra_init_regex: Additional regex pattern for keys not present in the checkpoint that should be randomly initialized from the model (e.g. new module heads). Combined with the default ".*lora.*" pattern via OR.
     """
 
     params_path: str
+    extra_init_regex: str | None = None
 
     def load(self, params: at.Params) -> at.Params:
         # We are loading np.ndarray and relying on the training code to properly convert and shard the params.
         loaded_params = _model.restore_params(download.maybe_download(self.params_path), restore_type=np.ndarray)
-        # Add all missing LoRA weights.
-        return _merge_params(loaded_params, params, missing_regex=".*lora.*")
+        # Add all missing LoRA weights, plus any extra keys specified by the caller.
+        missing_regex = ".*lora.*"
+        if self.extra_init_regex:
+            missing_regex = f"{missing_regex}|{self.extra_init_regex}"
+        return _merge_params(loaded_params, params, missing_regex=missing_regex)
 
 
 @dataclasses.dataclass(frozen=True)
